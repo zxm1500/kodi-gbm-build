@@ -37,7 +37,8 @@ jobs:
         cd xbmc
         mkdir -p build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCORE_PLATFORM_NAME=gbm -DAPP_RENDER_SYSTEM=gles
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCORE_PLATFORM_NAME=gbm -DAPP_RENDER_SYSTEM=gles \
+                 -DENABLE_INTERNAL_FFMPEG=ON
         make -j$(nproc)
 
     - name: Package .deb
