@@ -50,7 +50,8 @@ jobs:
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_INTERNAL_FFMPEG=ON \
-            -DENABLE_INTERNAL_FLATBUFFERS=ON
+            -DENABLE_INTERNAL_FLATBUFFERS=ON \
+            -DENABLE_INTERNAL_FSTRCMP=ON
           make -j$(nproc)
 
       # 6️⃣ 打包为 .deb 文件
