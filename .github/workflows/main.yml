@@ -1,68 +1,68 @@
-name: Build Kodi GBM for Ubuntu Server 24.04 x86_64
+name: Build Kodi GBM for Ubuntu 24.04
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:  # 手动触发
 
 jobs:
   build:
-    runs-on: ubuntu-24.04  # 使用 Ubuntu 24.04 运行器
+    runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # 1️⃣ Checkout 源码
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        # 添加 Kodi nightly PPA 以获取 dcadec-dev
-        sudo apt-get install -y software-properties-common
-        sudo add-apt-repository ppa:team-xbmc/ppa -y
-        sudo apt-get update
-        # 安装依赖：替换 libdcadec-dev 为 dcadec-dev
-        sudo apt-get install -y git cmake build-essential autoconf autogen automake libtool libass-dev libdrm-dev libegl1-mesa-dev libgbm-dev libgles2-mesa-dev libwayland-dev libxkbcommon-dev libpulse-dev libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libdvdnav-dev libdvdread-dev libbluray-dev libfreetype6-dev libfribidi-dev libharfbuzz-dev libfontconfig-dev libxml2-dev libxslt1-dev libmicrohttpd-dev libudfread-dev libmpeg2-4-dev libvdpau-dev libva-dev libvorbis-dev libogg-dev libflac-dev libcdio-paranoia-dev libiso9660-dev libplist-dev libtinyxml2-dev python3-dev nasm yasm zlib1g-dev libcurl4-gnutls-dev libtag1-dev libcrossguid-dev liblzo2-dev libbz2-dev dcadec-dev libsamplerate0-dev libwavpack-dev libxml2-utils python3-pip
-        # 额外 GBM/DRM 依赖
-        sudo apt-get install -y libinput-dev libmtdev-dev libudev-dev libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxi-dev libxfixes-dev
+      # 2️⃣ 安装依赖
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            git build-essential cmake autopoint gettext \
+            libtool curl zip unzip libdrm-dev libgbm-dev libfmt-dev \
+            libspdlog-dev libfreetype6-dev libfribidi-dev libpcre3-dev \
+            libcrossguid-dev libjpeg-dev libpng-dev libtiff-dev \
+            libxml2-dev liblzo2-dev libass-dev libssl-dev libmicrohttpd-dev \
+            libbluray-dev libdvdnav-dev libdvdread-dev libcurl4-openssl-dev \
+            libcdio-dev libsamplerate0-dev libpulse-dev libinput-dev \
+            libudev-dev libxrandr-dev libegl1-mesa-dev libgles2-mesa-dev \
+            mesa-utils python3-dev python3-pil python3-setuptools \
+            python3-distutils libexiv2-dev ffmpeg libavcodec-dev \
+            libavformat-dev libavutil-dev libswscale-dev \
+            flatbuffers-dev
 
-    - name: Get latest Kodi tag
-      id: kodi_tag
-      run: |
-        LATEST_TAG=$(git ls-remote --tags https://github.com/xbmc/xbmc.git | grep -v '{}' | awk '{print $2}' | sort -V | tail -n1 | sed 's/refs\/tags\///')
-        echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-        echo "Latest Kodi tag: $LATEST_TAG"
+      # 3️⃣ 下载 Kodi 源码
+      - name: Download Kodi source
+        run: |
+          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
+          cd kodi-src
 
-    - name: Clone Kodi source
-      run: |
-        git clone --branch ${{ steps.kodi_tag.outputs.tag }} --depth 1 https://github.com/xbmc/xbmc.git kodi-source
-        cd kodi-source
-        git submodule update --init --recursive
+      # 4️⃣ 创建 build 目录
+      - name: Create build directory
+        run: |
+          cd kodi-src
+          mkdir -p build
 
-    - name: Configure and build Kodi with GBM
-      run: |
-        chmod +x build.sh
-        ./build.sh ${{ steps.kodi_tag.outputs.tag }}
+      # 5️⃣ 编译 Kodi GBM
+      - name: Build Kodi GBM
+        run: |
+          cd kodi-src/build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCORE_PLATFORM_NAME=gbm \
+            -DAPP_RENDER_SYSTEM=gles \
+            -DENABLE_INTERNAL_FFMPEG=ON \
+            -DENABLE_INTERNAL_FLATBUFFERS=ON
+          make -j$(nproc)
 
-    - name: Package release
-      run: |
-        tar -czf kodi-${{ steps.kodi_tag.outputs.tag }}-gbm-ubuntu24.04-x86_64.tar.gz -C build/kodi-gbm/ .
-        ls -la kodi-*.tar.gz
+      # 6️⃣ 打包为 .deb 文件
+      - name: Package Kodi as .deb
+        run: |
+          cd kodi-src/build
+          cpack -G DEB
 
-    - name: Create Release
-      if: github.ref == 'refs/heads/main'  # 只在 main 分支 push 时创建 release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ steps.kodi_tag.outputs.tag }}
-        name: Kodi ${{ steps.kodi_tag.outputs.tag }} GBM Ubuntu 24.04 x86_64
-        body: |
-          Auto-built Kodi GBM version for Ubuntu Server 24.04 (x86_64, Intel i5-1235U compatible).
-          - Platform: x86_64
-          - Backend: GBM (no Xorg)
-          - Archive: kodi-${{ steps.kodi_tag.outputs.tag }}-gbm-ubuntu24.04-x86_64.tar.gz
-        files: kodi-*.tar.gz
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 7️⃣ 上传产物
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-gbm
+          path: kodi-src/build/*.deb
