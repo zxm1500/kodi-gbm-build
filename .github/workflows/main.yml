@@ -45,7 +45,7 @@ jobs:
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DENABLE_DAV1D=ON
+            -DENABLE_INTERNAL_DAV1D=ON \
           make -j$(nproc)
 
       - name: Package Kodi
