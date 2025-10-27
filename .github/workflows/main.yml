@@ -1,66 +1,62 @@
-name: Build Kodi (GBM x86_64 Ubuntu 24.04)
+name: Build Kodi GBM for Ubuntu 24.04
 
 on:
-  push:
-  workflow_dispatch:
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
-      - name: Checkout source
+      - name: Checkout this repository
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y software-properties-common
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autopoint gettext autotools-dev cmake curl default-jre gawk gcc g++ cpp \
+            flatbuffers-compiler libflatbuffers-dev \
+            gperf libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev libbluetooth-dev \
+            libbluray-dev libbz2-dev libcdio-dev libcec-dev libp8-platform-dev libcrossguid-dev \
+            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
+            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev libfstrcmp-dev libgcrypt-dev \
+            libgif-dev libgl1-mesa-dev libglew-dev libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
+            libgtest-dev libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
+            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev libplist-dev \
+            libpng-dev libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
+            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev libtool libudev-dev \
+            libunistring-dev libva-dev libvdpau-dev libvorbis-dev libxkbcommon-dev libxmu-dev \
+            libxrandr-dev libxslt-dev libxt-dev wayland-protocols meson nasm ninja-build python3-dev \
+            python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev
 
-          # 核心依赖
-          sudo apt install -y \
-            autoconf automake autopoint gettext autotools-dev cmake curl \
-            default-jre gawk gcc g++ cpp gdc gperf \
-            libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev \
-            libbluetooth-dev libbluray-dev libbz2-dev libcdio-dev \
-            libcec-dev libp8-platform-dev libcrossguid-dev libcurl4-openssl-dev \
-            libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfmt-dev libfreetype6-dev libfribidi-dev \
-            libfstrcmp-dev libgcrypt-dev libgif-dev libgl1-mesa-dev libglew-dev \
-            libglu1-mesa-dev libgnutls28-dev libgpg-error-dev libgtest-dev \
-            libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev \
-            liblzo2-dev libmicrohttpd-dev libmysqlclient-dev libnfs-dev \
-            libogg-dev libpcre2-dev libplist-dev libpng-dev libpulse-dev \
-            libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
-            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev \
-            libtool libudev-dev libunistring-dev libva-dev libvdpau-dev \
-            libvorbis-dev libxkbcommon-dev libxmu-dev libxrandr-dev libxslt1-dev \
-            libxt-dev wayland-protocols lsb-release meson nasm ninja-build \
-            python3-dev python3-pil python3-minimal swig unzip uuid-dev zip \
-            zlib1g-dev nlohmann-json3-dev
-
-          # 手动安装 flatbuffers（编译源码）
-          git clone --branch v23.5.26 https://github.com/google/flatbuffers.git
-          cd flatbuffers
-          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
-          make -j$(nproc)
-          sudo make install
-          cd ..
-          rm -rf flatbuffers
-
-          # 补充头文件路径（解决 NlohmannJSON 检测不到问题）
-          sudo mkdir -p /usr/local/include/nlohmann
-          sudo cp -r /usr/include/nlohmann /usr/local/include/ || true
-
-
-      - name: Prepare build directory
+      - name: Clone Kodi source
         run: |
+          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
+
+      - name: Configure and build Kodi GBM
+        run: |
+          cd kodi-src
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_INTERNAL_FFMPEG=ON -DENABLE_DAV1D=ON
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCORE_PLATFORM_NAME=gbm \
+            -DAPP_RENDER_SYSTEM=gles \
+            -DENABLE_INTERNAL_FFMPEG=ON \
+            -DENABLE_INTERNAL_FLATBUFFERS=ON \
+            -DENABLE_DAV1D=ON
           make -j$(nproc)
 
-      - name: Install Kodi
+      - name: Package Kodi
         run: |
-          sudo make -C build install
+          cd kodi-src/build
+          cpack -G DEB
+          mkdir -p ../../artifacts
+          cp *.deb ../../artifacts/ || true
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-gbm-ubuntu24.04
+          path: artifacts/
