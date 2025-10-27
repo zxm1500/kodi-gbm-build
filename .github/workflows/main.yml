@@ -1,68 +1,75 @@
-name: Build Kodi GBM for Ubuntu 24.04
+name: Build Kodi GBM (Ubuntu 24.04 x86_64)
 
 on:
-  workflow_dispatch:  # 手动触发
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-      # 1️⃣ Checkout 源码
-      - name: Checkout repository
+      - name: Checkout Kodi source
         uses: actions/checkout@v4
 
-      # 2️⃣ 安装依赖
-      - name: Install dependencies
+      - name: Install all build dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
-            git build-essential cmake autopoint gettext \
-            libtool curl zip unzip libdrm-dev libgbm-dev libfmt-dev \
-            libspdlog-dev libfreetype6-dev libfribidi-dev libpcre3-dev \
-            libcrossguid-dev libjpeg-dev libpng-dev libtiff-dev \
-            libxml2-dev liblzo2-dev libass-dev libssl-dev libmicrohttpd-dev \
-            libbluray-dev libdvdnav-dev libdvdread-dev libcurl4-openssl-dev \
-            libcdio-dev libsamplerate0-dev libpulse-dev libinput-dev \
-            libudev-dev libxrandr-dev libegl1-mesa-dev libgles2-mesa-dev \
-            mesa-utils python3-dev python3-pil python3-setuptools \
-            libexiv2-dev ffmpeg libavcodec-dev \
-            libavformat-dev libavutil-dev libswscale-dev libtool libdav1d-dev
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autopoint autotools-dev gettext \
+            cmake curl default-jre gawk gperf build-essential \
+            meson nasm ninja-build uuid-dev ccache unzip zip \
+            libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev \
+            libbluetooth-dev libbluray-dev libbz2-dev libcdio-dev \
+            libcec-dev libp8-platform-dev libcrossguid-dev \
+            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev \
+            libegl1-mesa-dev libenca-dev libexiv2-dev libflac-dev \
+            libfontconfig-dev libfmt10-dev libfreetype6-dev libfribidi-dev \
+            libfstrcmp-dev libgcrypt-dev libgif-dev libglew-dev \
+            libgl1-mesa-dev libglu1-mesa-dev libgnutls28-dev \
+            libgpg-error-dev libgtest-dev libiso9660-dev libjpeg-dev \
+            liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
+            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev \
+            libpcre2-dev libplist-dev libpng-dev libpulse-dev \
+            libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
+            libssl-dev libtag1-dev libtiff5-dev libtinyxml2-dev \
+            libtool libudev-dev libunistring-dev libva-dev libvdpau-dev \
+            libvorbis-dev libxkbcommon-dev libxmu-dev libxrandr-dev \
+            libxslt1-dev libxt-dev libwaylandpp-dev wayland-protocols \
+            python3 python3-dev python3-pil python3-minimal \
+            python3-setuptools python3-wheel python3-venv \
+            swig lsb-release
 
-      # 3️⃣ 下载 Kodi 源码
-      - name: Download Kodi source
+      - name: Prepare build directory
         run: |
-          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
-          cd kodi-src
-
-      # 4️⃣ 创建 build 目录
-      - name: Create build directory
-        run: |
-          cd kodi-src
           mkdir -p build
-
-      # 5️⃣ 编译 Kodi GBM
-      - name: Build Kodi GBM
-        run: |
-          cd kodi-src/build
+          cd build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_INTERNAL_FFMPEG=ON \
-            -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DENABLE_INTERNAL_FSTRCMP=ON
+            -DENABLE_INTERNAL_FLATBUFFERS=ON
+
+      - name: Build Kodi
+        run: |
+          cd build
           make -j$(nproc)
 
-      # 6️⃣ 打包为 .deb 文件
-      - name: Package Kodi as .deb
+      - name: Install Kodi
         run: |
-          cd kodi-src/build
-          cpack -G DEB
+          sudo make -C build install
 
-      # 7️⃣ 上传产物
+      - name: Package binaries
+        run: |
+          mkdir -p artifact
+          tar -czf artifact/kodi-gbm.tar.gz -C /usr/local/bin kodi
+          echo "✅ Build completed successfully"
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: kodi-gbm
-          path: kodi-src/build/*.deb
+          path: artifact/kodi-gbm.tar.gz
