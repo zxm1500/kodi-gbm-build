@@ -3,18 +3,21 @@ name: Build Kodi GBM (Ubuntu 24.04 x86_64)
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout Kodi source
+      - name: Checkout build scripts
         uses: actions/checkout@v4
 
-      - name: Install all build dependencies
+      - name: Clone Kodi source
+        run: |
+          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -44,28 +47,25 @@ jobs:
 
       - name: Prepare build directory
         run: |
-          mkdir -p build
-          cd build
+          mkdir -p kodi-src/build
+          cd kodi-src/build
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON
+            -DENABLE_CCACHE=ON
 
       - name: Build Kodi
         run: |
-          cd build
+          cd kodi-src/build
           make -j$(nproc)
-
-      - name: Install Kodi
-        run: |
-          sudo make -C build install
 
       - name: Package binaries
         run: |
           mkdir -p artifact
-          tar -czf artifact/kodi-gbm.tar.gz -C /usr/local/bin kodi
+          tar -czf artifact/kodi-gbm.tar.gz -C kodi-src/build kodi.bin
           echo "✅ Build completed successfully"
 
       - name: Upload artifact
