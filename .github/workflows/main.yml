@@ -26,9 +26,8 @@ jobs:
             libcdio-dev libsamplerate0-dev libpulse-dev libinput-dev \
             libudev-dev libxrandr-dev libegl1-mesa-dev libgles2-mesa-dev \
             mesa-utils python3-dev python3-pil python3-setuptools \
-            python3-distutils libexiv2-dev ffmpeg libavcodec-dev \
-            libavformat-dev libavutil-dev libswscale-dev \
-            flatbuffers-dev
+            libexiv2-dev ffmpeg libavcodec-dev \
+            libavformat-dev libavutil-dev libswscale-dev
 
       # 3️⃣ 下载 Kodi 源码
       - name: Download Kodi source
