@@ -34,6 +34,14 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
 
+      - name: Build libdisplay-info
+        run: |
+          git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+          cd libdisplay-info
+          meson setup build
+          meson compile -C build
+          sudo meson install -C build
+
       - name: Configure Kodi GBM
         run: |
           cd kodi-src
