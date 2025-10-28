@@ -73,7 +73,11 @@ jobs:
           cd kodi-src/build
           cpack -G DEB
           mkdir -p ../../artifacts
-          cp *.deb ../../artifacts/ || true
+          echo "Listing generated packages:"
+          ls -la packages/
+          cp packages/*.deb ../../artifacts/ || true
+          echo "Artifacts copied:"
+          ls -la ../../artifacts/
 
       - name: Upload DEB package
         uses: actions/upload-artifact@v4
