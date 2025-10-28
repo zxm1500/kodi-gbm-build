@@ -1,53 +1,114 @@
+
 name: Build Kodi GBM for Ubuntu 24.04
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      
+      - name: Checkout this repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y git build-essential cmake git-core autopoint gettext \
-          libtool curl zip unzip libdrm-dev libgbm-dev libfmt-dev libspdlog-dev \
-          libfreetype6-dev libfribidi-dev libpcre3-dev libcrossguid-dev \
-          libjpeg-dev libpng-dev libtiff-dev libxml2-dev liblzo2-dev libass-dev \
-          libssl-dev libmicrohttpd-dev libbluray-dev libdvdnav-dev libdvdread-dev \
-          libcurl4-openssl-dev libcdio-dev libsamplerate0-dev libpulse-dev \
-          libinput-dev libudev-dev libxrandr-dev libegl1-mesa-dev libgles2-mesa-dev \
-          mesa-utils python3-dev python3-pil python3-setuptools python3-distutils
+      # 1. 缓存 Kodi 源码
+      - name: Cache Kodi source
+        id: cache-kodi-src
+        uses: actions/cache@v4
+        with:
+          path: kodi-src
+          key: kodi-src-${{ hashFiles('kodi-src/.git/HEAD') }}
+          restore-keys: |
+            kodi-src-
 
-    - name: Clone Kodi
-      run: |
-        git clone --branch master https://github.com/xbmc/xbmc.git
-        cd xbmc
-        git submodule update --init --recursive
+      # 2. 仅在缓存未命中时才 clone
+      - name: Clone Kodi source
+        if: steps.cache-kodi-src.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
 
-    - name: Build Kodi GBM
-      run: |
-        cd xbmc
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCORE_PLATFORM_NAME=gbm -DAPP_RENDER_SYSTEM=gles
-        make -j$(nproc)
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autopoint gettext autotools-dev cmake curl default-jre gawk gcc g++ cpp \
+            flatbuffers-compiler libflatbuffers-dev \
+            gperf libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev libbluetooth-dev \
+            libbluray-dev libbz2-dev libcdio-dev libcec-dev libp8-platform-dev libcrossguid-dev \
+            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
+            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev libfstrcmp-dev libgcrypt-dev \
+            libgif-dev libgl1-mesa-dev libglew-dev libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
+            libgtest-dev libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
+            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev libplist-dev \
+            libpng-dev libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
+            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev libtool libudev-dev \
+            libunistring-dev libva-dev libvdpau-dev libvorbis-dev libxkbcommon-dev libxmu-dev \
+            libxrandr-dev libxslt-dev libxt-dev wayland-protocols meson nasm ninja-build python3-dev \
+            python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev libgbm-dev ccache \
+            libdrm-dev libinput-dev
+            
+      # 4. 缓存 ccache
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
+          restore-keys: ccache-${{ runner.os }}-
 
-    - name: Package .deb
-      run: |
-        cd xbmc/build
-        cpack -G DEB
-        mkdir -p ../../artifacts
-        mv *.deb ../../artifacts/
+      # 5. 初始化 ccache
+      - name: Setup ccache
+        run: |
+          mkdir -p ~/.ccache
+          ccache --max-size=2G
+          ccache --show-stats
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: kodi-gbm
-        path: artifacts/*.deb
+      - name: Build libdisplay-info
+        run: |
+          git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+          cd libdisplay-info
+          meson setup build
+          meson compile -C build
+          sudo meson install -C build
+
+      - name: Configure Kodi GBM
+        run: |
+          cd kodi-src
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCORE_PLATFORM_NAME=gbm \
+            -DAPP_RENDER_SYSTEM=gles \
+            -DENABLE_INTERNAL_FFMPEG=ON \
+            -DENABLE_INTERNAL_FLATBUFFERS=ON \
+            -DENABLE_INTERNAL_DAV1D=ON \
+            -DENABLE_CCACHE=ON \
+            -DCPACK_GENERATOR=DEB \
+            -DCPACK_PACKAGE_NAME=kodi \
+            -DCPACK_PACKAGE_CONTACT="zxm <zxm1500@gmail.com>" \
+            -DCPACK_PACKAGE_DESCRIPTION_SUMMARY="Kodi Media Center" \
+            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="zxm"
+      
+      - name: Build Kodi
+        run: |
+          cd kodi-src/build
+          make -j$(nproc)
+
+      - name: Package Kodi
+        run: |
+          cd kodi-src/build
+          cpack -G DEB
+          mkdir -p ../../artifacts
+          echo "Listing generated packages:"
+          ls -la packages/
+          cp packages/*.deb ../../artifacts/ || true
+          echo "Artifacts copied:"
+          ls -la ../../artifacts/
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-gbm-ubuntu24.04
+          path: artifacts/
