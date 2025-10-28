@@ -12,6 +12,21 @@ jobs:
       - name: Checkout this repository
         uses: actions/checkout@v4
 
+      # 1. 缓存 Kodi 源码
+      - name: Cache Kodi source
+        id: cache-kodi-src
+        uses: actions/cache@v4
+        with:
+          path: kodi-src
+          key: kodi-src-${{ hashFiles('kodi-src/.git/HEAD') }}
+          restore-keys: kodi-src-
+
+      # 2. 仅在未命中时 clone
+      - name: Clone Kodi source
+        if: steps.cache-kodi-src.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -32,18 +47,19 @@ jobs:
             python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev libgbm-dev ccache \
             libdrm-dev libinput-dev
             
+      # 4. 缓存 ccache
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-kodi-gbm-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            ccache-kodi-gbm-${{ runner.os }}-
-      
-      - name: Setup ccache dir
+          key: ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
+          restore-keys: ccache-${{ runner.os }}-
+
+      # 5. 初始化 ccache
+      - name: Setup ccache
         run: |
           mkdir -p ~/.ccache
-          ccache --max-size=1G   # 限制缓存大小为 1GB
+          ccache --max-size=2G
           ccache --show-stats
 
       - name: Clone Kodi source
