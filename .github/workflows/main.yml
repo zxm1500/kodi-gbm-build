@@ -99,12 +99,12 @@ jobs:
           name: kodi-gbm-ubuntu24.04
           path: artifacts/
 
-      - name: Upload to GitHub Releases
-        uses: softprops/action-gh-release@v2
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          files: artifacts/*.deb
-          tag_name: "build-${{ github.run_id }}"
-          name: "Kodi GBM Build #${{ github.run_id }}"
-          draft: false
-          prerelease: true
+      # - name: Upload to GitHub Releases
+      #   uses: softprops/action-gh-release@v2
+      #   if: github.event_name == 'workflow_dispatch'
+      #   with:
+      #     files: artifacts/*.deb
+      #     tag_name: "build-${{ github.run_id }}"
+      #     name: "Kodi GBM Build #${{ github.run_id }}"
+      #     draft: false
+      #     prerelease: true
