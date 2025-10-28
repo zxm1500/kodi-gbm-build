@@ -55,13 +55,13 @@ jobs:
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
-            -DENABLE_CCACHE=ON
+            -DENABLE_CCACHE=ON \
             -DCPACK_GENERATOR=DEB \
             -DCPACK_PACKAGE_NAME=kodi \
             -DCPACK_PACKAGE_VERSION=21.2 \
             -DCPACK_PACKAGE_CONTACT="zxm <zxm1500@gmail.com>" \
             -DCPACK_PACKAGE_DESCRIPTION_SUMMARY="Kodi Media Center" \
-            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="你的名字"
+            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="zxm"
       
       - name: Build Kodi
         run: |
