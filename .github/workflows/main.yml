@@ -19,9 +19,10 @@ jobs:
         with:
           path: kodi-src
           key: kodi-src-${{ hashFiles('kodi-src/.git/HEAD') }}
-          restore-keys: kodi-src-
+          restore-keys: |
+            kodi-src-
 
-      # 2. 仅在未命中时 clone
+      # 2. 仅在缓存未命中时才 clone
       - name: Clone Kodi source
         if: steps.cache-kodi-src.outputs.cache-hit != 'true'
         run: |
