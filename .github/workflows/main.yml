@@ -58,7 +58,7 @@ jobs:
             libxkbcommon-dev libxrandr-dev libxslt-dev libxt-dev \
             meson nasm ninja-build python3-dev swig unzip uuid-dev \
             zlib1g-dev nlohmann-json3-dev libgbm-dev libdrm-dev libinput-dev \
-            build-essential pkg-config rapidjson-dev libfstrcmp-dev
+            build-essential pkg-config rapidjson-dev libfstrcmp-dev libpcre3 libpcre3-dev
             
       # 4. 缓存 ccache
       - name: Setup ccache
