@@ -18,7 +18,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-${{ hashFiles('**/.git/HEAD') }}
+          key: kodi-src-21.3-Omega
           restore-keys: |
             kodi-src-
 
@@ -28,27 +28,37 @@ jobs:
         run: |
           git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
+      # -------- Cache APT --------
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /var/lib/apt/lists
+            /var/cache/apt/archives
+          key: apt-cache-ubuntu-24.04
+
       - name: Install dependencies
         run: |
-          sudo apt update && sudo apt upgrade -y
-          sudo apt-get install -y \
-            autoconf automake autopoint gettext autotools-dev cmake curl default-jre \
-            gawk gcc g++ cpp flatbuffers-compiler libflatbuffers-dev gperf \
-            libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev libbluetooth-dev \
-            libbluray-dev libbz2-dev libcdio-dev libcec-dev libp8-platform-dev libcrossguid-dev \
-            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev libfstrcmp-dev libgcrypt-dev \
-            libgif-dev libgl1-mesa-dev libglew-dev libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
-            libgtest-dev libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
-            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev libplist-dev \
-            libpng-dev libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
-            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev libtool libudev-dev \
-            libunistring-dev libva-dev libvdpau-dev libvorbis-dev libxkbcommon-dev libxmu-dev \
-            libxrandr-dev libxslt-dev libxt-dev wayland-protocols meson nasm ninja-build python3-dev \
-            python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev libgbm-dev ccache \
-            libdrm-dev libinput-dev build-essential pkg-config \
-            libfmt-dev libudfread-dev libpugixml-dev rapidjson-dev \
-            doxygen graphviz libwayland-dev
+          sudo apt update
+          sudo apt install -y \
+            autoconf automake autopoint gettext cmake curl \
+            gcc g++ flatbuffers-compiler libflatbuffers-dev \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev \
+            libcdio-dev libcec-dev libcurl4-openssl-dev \
+            libdbus-1-dev libegl1-mesa-dev libexiv2-dev \
+            libflac-dev libfontconfig-dev libfreetype6-dev \
+            libfribidi-dev libgcrypt-dev libgif-dev libgl1-mesa-dev \
+            libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
+            libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev \
+            liblzo2-dev libmicrohttpd-dev libnfs-dev libogg-dev \
+            libpcre2-dev libplist-dev libpng-dev libshairplay-dev \
+            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
+            libtag1-dev libtiff-dev libtinyxml2-dev libtool libudev-dev \
+            libunistring-dev libva-dev libvdpau-dev libvorbis-dev \
+            libxkbcommon-dev libxrandr-dev libxslt-dev libxt-dev \
+            meson nasm ninja-build python3-dev swig unzip uuid-dev \
+            zlib1g-dev nlohmann-json3-dev libgbm-dev libdrm-dev libinput-dev \
+            build-essential pkg-config rapidjson-dev
             
       # 4. 缓存 ccache
       - name: Setup ccache
@@ -75,20 +85,19 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
+            -DENABLE_OPENGL=OFF \
+            -DENABLE_GLX=OFF \
+            -DENABLE_VAAPI=OFF \
+            -DENABLE_VDPAU=OFF \
+            -DENABLE_X11=OFF \
             -DENABLE_PVR=ON \
             -DWITH_PVR_ADDONS=ON \
-            -DENABLE_INTERNAL_PVR=ON \
             -DENABLE_INTERNAL_FFMPEG=ON \
-            -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
-            -DCCACHE_FOUND=ON \
+            -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCPACK_GENERATOR=DEB \
-            -DCPACK_PACKAGE_NAME=kodi \
-            -DCPACK_PACKAGE_CONTACT="zxm <zxm1500@gmail.com>" \
-            -DCPACK_PACKAGE_DESCRIPTION_SUMMARY="Kodi Media Center" \
-            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="zxm"
+            -DCPACK_GENERATOR=DEB
       
       - name: Build Kodi
         run: |
