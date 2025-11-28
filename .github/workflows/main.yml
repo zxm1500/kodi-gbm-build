@@ -30,40 +30,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf automake autopoint gettext autotools-dev cmake curl default-jre gawk gcc g++ cpp \
-            flatbuffers-compiler libflatbuffers-dev \
-            gperf libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev libbluetooth-dev \
-            libbluray-dev libbz2-dev libcdio-dev libcec-dev libp8-platform-dev libcrossguid-dev \
-            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev libfstrcmp-dev libgcrypt-dev \
-            libgif-dev libgl1-mesa-dev libglew-dev libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
-            libgtest-dev libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
-            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev libplist-dev \
-            libpng-dev libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
-            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev libtool libudev-dev \
-            libunistring-dev libva-dev libvdpau-dev libvorbis-dev libxkbcommon-dev libxmu-dev \
-            libxrandr-dev libxslt-dev libxt-dev wayland-protocols meson nasm ninja-build python3-dev \
-            python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev libgbm-dev ccache \
-            libdrm-dev libinput-dev \
-            libfmt-dev libudfread-dev libpugixml-dev rapidjson-dev
+          sudo add-apt-repository -s ppa:team-xbmc/xbmc-nightly
+          sudo apt update && sudo apt upgrade -y
+          sudo apt build-dep kodi
             
       # 4. 缓存 ccache
-      - name: Cache ccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
-          restore-keys: ccache-${{ runner.os }}-
-
-      # 5. 初始化 ccache
       - name: Setup ccache
-        run: |
-          mkdir -p ~/.ccache
-          ccache --max-size=2G
-          ccache --show-stats
+        uses: hendrikmuhs/ccache-action@v1.2.9
+        with:
+          key: kodi-ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
+          max-size: 2G
 
+      # 5. 构建libdisplay-info
       - name: Build libdisplay-info
         run: |
           git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
@@ -87,7 +65,9 @@ jobs:
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
-            -DENABLE_CCACHE=ON \
+            -DCCACHE_FOUND=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB \
             -DCPACK_PACKAGE_NAME=kodi \
             -DCPACK_PACKAGE_CONTACT="zxm <zxm1500@gmail.com>" \
