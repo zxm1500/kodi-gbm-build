@@ -78,15 +78,14 @@ jobs:
 
       - name: Build libfstrcmp
         run: |
-          git clone https://github.com/Distrotech/fstrcmp.git --depth=1  \
-            --config http.extraheader="Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+          cd /tmp
+          git clone https://github.com/Distrotech/fstrcmp.git --depth=1
           cd fstrcmp
           autoreconf -fi
           ./configure
           make -j$(nproc)
           sudo make install
           sudo ldconfig
-
 
       - name: Configure Kodi GBM
         run: |
