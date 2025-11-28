@@ -76,6 +76,16 @@ jobs:
           meson compile -C build
           sudo meson install -C build
 
+      - name: Build libfstrcmp
+        run: |
+          git clone https://github.com/Distrotech/fstrcmp.git
+          cd fstrcmp
+          autoreconf -fi
+          ./configure
+          make -j$(nproc)
+          sudo make install
+          sudo ldconfig
+
       - name: Configure Kodi GBM
         run: |
           cd kodi-src
