@@ -26,13 +26,29 @@ jobs:
       - name: Clone Kodi source
         if: steps.cache-kodi-src.outputs.cache-hit != 'true'
         run: |
-          git clone --depth=1 https://github.com/xbmc/xbmc.git kodi-src
+          git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
       - name: Install dependencies
         run: |
-          sudo add-apt-repository -s ppa:team-xbmc/xbmc-nightly
           sudo apt update && sudo apt upgrade -y
-          sudo apt build-dep kodi
+          sudo apt-get install -y \
+            autoconf automake autopoint gettext autotools-dev cmake curl default-jre \
+            gawk gcc g++ cpp flatbuffers-compiler libflatbuffers-dev gperf \
+            libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev libbluetooth-dev \
+            libbluray-dev libbz2-dev libcdio-dev libcec-dev libp8-platform-dev libcrossguid-dev \
+            libcurl4-openssl-dev libcwiid-dev libdbus-1-dev libegl1-mesa-dev libenca-dev libexiv2-dev \
+            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev libfstrcmp-dev libgcrypt-dev \
+            libgif-dev libgl1-mesa-dev libglew-dev libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
+            libgtest-dev libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev libltdl-dev liblzo2-dev \
+            libmicrohttpd-dev libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev libplist-dev \
+            libpng-dev libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev libsqlite3-dev \
+            libssl-dev libtag1-dev libtiff-dev libtinyxml-dev libtinyxml2-dev libtool libudev-dev \
+            libunistring-dev libva-dev libvdpau-dev libvorbis-dev libxkbcommon-dev libxmu-dev \
+            libxrandr-dev libxslt-dev libxt-dev wayland-protocols meson nasm ninja-build python3-dev \
+            python3-pil swig unzip uuid-dev zip zlib1g-dev nlohmann-json3-dev libgbm-dev ccache \
+            libdrm-dev libinput-dev build-essential pkg-config \
+            libfmt-dev libudfread-dev libpugixml-dev rapidjson-dev \
+            doxygen graphviz libwayland-dev
             
       # 4. 缓存 ccache
       - name: Setup ccache
@@ -95,13 +111,3 @@ jobs:
         with:
           name: kodi-gbm-ubuntu24.04
           path: artifacts/
-
-      # - name: Upload to GitHub Releases
-      #   uses: softprops/action-gh-release@v2
-      #   if: github.event_name == 'workflow_dispatch'
-      #   with:
-      #     files: artifacts/*.deb
-      #     tag_name: "build-${{ github.run_id }}"
-      #     name: "Kodi GBM Build #${{ github.run_id }}"
-      #     draft: false
-      #     prerelease: true
