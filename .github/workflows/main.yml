@@ -17,18 +17,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-final
+          key: kodi-src-21.3-Omega-20251129-ultimate
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 安装 PCRE3（关键修复：从 22.04 仓库拉） -----------------
-      - name: Install libpcre3-dev for Kodi build
+      # ----------------- 启用 universe 仓库 + 安装 libpcre3-dev -----------------
+      - name: Enable universe and install libpcre3-dev
         run: |
-          # 添加 Ubuntu 22.04 old-releases 源（只为 PCRE1）
-          echo "deb http://old-releases.ubuntu.com/ubuntu jammy main universe" | sudo tee /etc/apt/sources.list.d/jammy-pcre.list
+          # 启用 universe（Ubuntu 24.04 默认可能未全启）
+          sudo add-apt-repository universe -y
           sudo apt update
           sudo apt install -y libpcre3-dev
 
@@ -56,7 +56,7 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-final
+          key: kodi-ccache-20251129-ultimate
           max-size: 2G
 
       # ----------------- 补丁：禁用 Kodi 的 FindPCRE.cmake -----------------
@@ -121,10 +121,10 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-final
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-ultimate
           path: ~/artifacts/*.deb
 
       - name: List packages
         run: |
-          echo "构建成功！生成的包："
+          echo "构建大成功！生成的 DEB 包如下："
           ls -lh ~/artifacts/*.deb
