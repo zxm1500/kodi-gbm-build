@@ -11,51 +11,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ----------------- Kodi 源码缓存 -----------------
       - name: Cache Kodi source
         id: cache-kodi
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-final-${{ github.run_id }}
-          restore-keys: kodi-src-21.3-Omega-final-
+          key: kodi-src-21.3-Omega-20250820
+          restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
-        run: |
-          git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
+        run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      - name: Install dependencies
+      # ----------------- 安装依赖（一次性写全，绝不换行炸裂） -----------------
+      - name: Install all dependencies
         run: |
           sudo apt update
-          sudo apt install -y \
+          sudo DEBIAN_FRONTEND=noninteractive apt install -y \
             autoconf automake autopoint bison flex gettext libtool libtool-bin \
-            cmake curl gcc g++ git pkg-config yasm nasm meson ninja-build \
-            swig unzip ccache build-essential \
-            libasound2-dev libass-dev libbluray-dev libbz2-dev libcdio-dev \
-            libcec-dev libcurl4-openssl-dev libdbus-1-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev \
-            libgcrypt20-dev libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
-            libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
-            liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev \
-            libnfs-dev libogg-dev libpcre2-dev \   # 只装 pcre2
-            libplist-dev libpng-dev libpulse-dev libshairplay-dev \
-            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
-            libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
-            libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
-            libxkbcommon-dev libxrandr-dev zlib1g-dev \
-            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
-            libdisplay-info-dev liburiparser-dev rapidjson-dev \
-            nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
-            python3-dev
+            cmake curl gcc g++ git pkg-config yasm nasm meson ninja-build swig unzip ccache build-essential \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev libcdio-dev libcec-dev \
+            libcurl4-openssl-dev libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
+            libfreetype6-dev libfribidi-dev libgcrypt20-dev libgif-dev libgl1-mesa-dev \
+            libglu1-mesa-dev libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
+            liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev libnfs-dev libogg-dev \
+            libpcre2-dev libplist-dev libpng-dev libpulse-dev libshairplay-dev \
+            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev libtag1-dev \
+            libtiff5-dev libtinyxml2-dev libudev-dev libva-dev libvdpau-dev \
+            libvorbis-dev libxml2-dev libxslt1-dev libxkbcommon-dev libxrandr-dev \
+            zlib1g-dev libwayland-dev libgbm-dev libdrm-dev libinput-dev \
+            libdisplay-info-dev liburiparser-dev rapidjson-dev nlohmann-json3-dev \
+            flatbuffers-compiler libflatbuffers-dev python3-dev
 
+      # ----------------- ccache -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-final-${{ hashFiles('kodi-src/.git/HEAD') }}
+          key: kodi-ccache-20250820
           max-size: 2G
 
-      # ==================== 关键修复在这里 ====================
-      - name: Build Kodi GBM (终极版)
+      # ----------------- 编译 Kodi GBM（所有坑已填平） -----------------
+      - name: Build Kodi GBM
         run: |
           cd kodi-src
           rm -rf build && mkdir build && cd build
@@ -76,7 +73,7 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_FSTRCMP=ON \
-            -DENABLE_PCRE2=ON \                    # 关键：强制使用 PCRE2
+            -DENABLE_PCRE2=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
@@ -84,12 +81,12 @@ jobs:
           make -j$(nproc)
           cpack -G DEB
 
+      # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple
         run: |
           cd kodi-src/addons
           rm -rf pvr.iptvsimple
           git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
-
           cd pvr.iptvsimple
           mkdir build && cd build
 
@@ -107,10 +104,11 @@ jobs:
           cp ../../build/*.deb ~/artifacts/ 2>/dev/null || true
           cp *.deb ~/artifacts/
 
+      # ----------------- 上传 -----------------
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-final
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04
           path: ~/artifacts/*.deb
 
       - name: List packages
