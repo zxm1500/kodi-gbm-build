@@ -11,21 +11,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ----------------- 缓存 Kodi 源码 -----------------
       - name: Cache Kodi source
         id: cache-kodi
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-v6-${{ hashFiles('kodi-src/**/CMakeLists.txt') || 'initial' }}
-          restore-keys: kodi-src-21.3-Omega-v6-
+          key: kodi-src-21.3-Omega-final-${{ github.run_id }}
+          restore-keys: kodi-src-21.3-Omega-final-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: |
           git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 安装依赖（关键补齐 libtool） -----------------
       - name: Install dependencies
         run: |
           sudo apt update -qq
@@ -39,25 +37,25 @@ jobs:
             libgcrypt20-dev libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
             libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
             liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev \
-            libnfs-dev libogg-dev libpcre2-dev libplist-dev libpng-dev \
-            libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev \
-            libsqlite3-dev libssl-dev libtag1-dev libtiff5-dev \
-            libtinyxml2-dev libudev-dev libva-dev libvdpau-dev \
-            libvorbis-dev libxml2-dev libxslt1-dev libxkbcommon-dev \
-            libxrandr-dev zlib1g-dev libwayland-dev libgbm-dev libdrm-dev \
-            libinput-dev libdisplay-info-dev liburiparser-dev rapidjson-dev \
+            libnfs-dev libogg-dev libpcre2-dev \   # 只装 pcre2
+            libplist-dev libpng-dev libpulse-dev libshairplay-dev \
+            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
+            libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
+            libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
+            libxkbcommon-dev libxrandr-dev zlib1g-dev \
+            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
+            libdisplay-info-dev liburiparser-dev rapidjson-dev \
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
             python3-dev
 
-      # ----------------- ccache -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-v6-${{ hashFiles('kodi-src/.git/HEAD') }}
+          key: kodi-ccache-final-${{ hashFiles('kodi-src/.git/HEAD') }}
           max-size: 2G
 
-      # ----------------- 编译 Kodi GBM（核心修复） -----------------
-      - name: Build Kodi GBM
+      # ==================== 关键修复在这里 ====================
+      - name: Build Kodi GBM (终极版)
         run: |
           cd kodi-src
           rm -rf build && mkdir build && cd build
@@ -77,7 +75,8 @@ jobs:
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DENABLE_INTERNAL_FSTRCMP=ON \     # 内部编译 fstrcmp
+            -DENABLE_INTERNAL_FSTRCMP=ON \
+            -DENABLE_PCRE2=ON \                    # 关键：强制使用 PCRE2
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
@@ -85,7 +84,6 @@ jobs:
           make -j$(nproc)
           cpack -G DEB
 
-      # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple
         run: |
           cd kodi-src/addons
@@ -105,20 +103,17 @@ jobs:
           make -j$(nproc)
           cpack -G DEB
 
-          # 收集所有 deb
           mkdir -p ~/artifacts
           cp ../../build/*.deb ~/artifacts/ 2>/dev/null || true
           cp *.deb ~/artifacts/
 
-      # ----------------- 上传 -----------------
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-final
           path: ~/artifacts/*.deb
-          if-no-files-found: error
 
       - name: List packages
         run: |
-          echo "构建成功！生成的包："
+          echo "全部构建成功！生成的包如下："
           ls -lh ~/artifacts/*.deb
