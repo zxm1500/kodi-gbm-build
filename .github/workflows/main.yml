@@ -17,14 +17,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-pcre-system
+          key: kodi-src-21.3-Omega-20251129-findpcre-fix
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 启用 universe + 安装 PCRE3（Kodi 官方 fix） -----------------
+      # ----------------- 启用 universe + 安装 PCRE3（提供头文件/库） -----------------
       - name: Enable universe and install PCRE3
         run: |
           sudo add-apt-repository universe -y
@@ -55,19 +55,21 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-pcre-system
+          key: kodi-ccache-20251129-findpcre-fix
           max-size: 2G
 
-      # ----------------- 验证 pcre-config（系统自带，无需手动脚本） -----------------
-      - name: Verify pcre-config
+      # ----------------- 验证 pcre-config 和头文件（系统自带） -----------------
+      - name: Verify PCRE installation
         run: |
           which pcre-config
           pcre-config --version  # 应输出 8.39
+          pkg-config --exists pcre && echo "PCRE pkg-config OK" || echo "PCRE pkg-config missing (OK, use Find module)"
+          ls /usr/include/pcre.h  # 确认头文件存在
 
-      # ----------------- 补丁：禁用 Kodi 的 FindPCRE.cmake（让它用系统 pcre-config） -----------------
-      - name: Patch FindPCRE.cmake
+      # ----------------- 关键修复：不 mv FindPCRE.cmake，让 Kodi 用模块模式找头文件/库 -----------------
+      - name: No patch for FindPCRE (use Kodi's module mode)
         run: |
-          mv kodi-src/cmake/modules/FindPCRE.cmake kodi-src/cmake/modules/FindPCRE.cmake.disabled || true
+          echo "Keeping FindPCRE.cmake intact - it will find pcre.h and libpcre from libpcre3-dev"
 
       # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
@@ -126,10 +128,10 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-pcre-system
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-findpcre
           path: ~/artifacts/*.deb
 
       - name: List packages
         run: |
-          echo "构建大成功！生成的 DEB 包如下："
+          echo "构建成功！生成的 DEB 包如下："
           ls -lh ~/artifacts/*.deb
