@@ -141,10 +141,22 @@ jobs:
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
-          sudo make install  # 关键：实际安装到系统
-          # 生成 DEB
-          cpack -G DEB || (ls -la && echo "cpack failed"; exit 1)
-          cp -v *.deb ~/artifacts/ || echo "No Kodi DEB found in $(pwd)"
+
+          # 关键修复1：Kodi 必须先 make install 才能让 cpack 正确生成包名
+          sudo make install
+          # 或者用 destdir 安装到临时目录再打包（更干净，但需要额外一步）
+          # make DESTDIR=/tmp/kodi-install install
+
+          # 关键修复2：明确指定工作目录并显示生成的文件
+          echo "=== Running cpack in $(pwd) ==="
+          cpack -G DEB -V
+
+          echo "=== List all files after cpack ==="
+          ls -la *.deb || echo "No .deb here"
+
+          # 关键修复3：万一文件名带版本号之类的，用通配符全部搬走
+          mkdir -p ~/artifacts
+          cp -v *.deb ~/artifacts/ || echo "Warning: No Kodi main package generated"
 
       # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple addon
@@ -153,17 +165,30 @@ jobs:
           cd kodi-src/addons
           rm -rf pvr.iptvsimple
           git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
-          mkdir -p pvr.iptvsimple/build
-          cd pvr.iptvsimple/build
-      
+          cd pvr.iptvsimple
+
+          mkdir -p build && cd build
+
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DADDON_SRC_PREFIX=../.. \
             -DCMAKE_PREFIX_PATH=/usr/local \
+            -DPACKAGE_ZIP=1 \
             -DCPACK_GENERATOR=DEB
-      
+
           make -j$(nproc)
-          cpack -G DEB || true
-          cp -v *.deb ~/artifacts/ || true
+          make install DESTDIR=/tmp/pvr-install
+
+          echo "=== Running cpack for pvr.iptvsimple ==="
+          cpack -G DEB -V
+
+          echo "=== pvr.iptvsimple generated files ==="
+          find . -name "*.deb" -ls
+          find . -name "*.zip" -ls
+
+          mkdir -p ~/artifacts
+          cp -v *.deb *.zip ~/artifacts/ 2>/dev/null || echo "Warning: No pvr.iptvsimple deb/zip generated"
 
       # ----------------- 上传所有 DEB -----------------
       - name: Upload DEB packages
