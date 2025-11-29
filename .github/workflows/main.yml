@@ -11,24 +11,48 @@ jobs:
       LD_LIBRARY_PATH: /home/runner/.local/lib
 
     steps:
-      - name: Checkout repository
+      - name: Checkout workflow repo
         uses: actions/checkout@v4
 
-      # ----------------- Kodi 源码缓存 -----------------
+      # 获取目标分支的最新 commit SHA，用作缓存 key
+      - name: Get Kodi remote commit SHA
+        id: kodi_sha
+        run: |
+          set -e
+          REPO="https://github.com/xbmc/xbmc.git"
+          BRANCH="21.3-Omega"
+          SHA=$(git ls-remote --heads "$REPO" "refs/heads/$BRANCH" | cut -f1)
+          if [ -z "$SHA" ]; then
+            echo "Failed to resolve remote SHA for $REPO#$BRANCH"
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      # ----------------- 源码缓存（基于远程 commit SHA） -----------------
       - name: Cache Kodi source
         id: cache-kodi-src
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-v3-${{ hashFiles('kodi-src/**/CMakeLists.txt') || runner.temp }}
-          restore-keys: kodi-src-21.3-Omega-v3-
+          key: kodi-src-21.3-Omega-v3-${{ steps.kodi_sha.outputs.sha }}
+          restore-keys: |
+            kodi-src-21.3-Omega-v3-
 
       - name: Clone Kodi source (only when cache miss)
         if: steps.cache-kodi-src.outputs.cache-hit != 'true'
         run: |
           git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 系统依赖（完整且精简） -----------------
+      # 如果 cache 命中但目录不存在（极端情况），仍然确保目录存在
+      - name: Ensure kodi-src exists
+        if: steps.cache-kodi-src.outputs.cache-hit == 'true'
+        run: |
+          if [ ! -d kodi-src ]; then
+            echo "Cache reported hit but kodi-src missing; cloning as fallback"
+            git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
+          fi
+
+      # ----------------- 系统依赖（完整且补充必要打包/egl包） -----------------
       - name: Install dependencies
         run: |
           sudo apt update -qq
@@ -36,12 +60,13 @@ jobs:
             autoconf automake autopoint bison flex gettext \
             cmake curl gcc g++ git pkg-config yasm nasm \
             meson ninja-build swig unzip ccache \
-            build-essential libtool \
+            build-essential libtool fakeroot dpkg-dev \
             libasound2-dev libass-dev libbluray-dev libbz2-dev \
             libcdio-dev libcec-dev libcurl4-openssl-dev \
             libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
             libfreetype6-dev libfribidi-dev libgcrypt20-dev \
             libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libegl1-mesa-dev libgles2-mesa-dev \
             libgnutls28-dev libgpg-error-dev libiso9660-dev \
             libjpeg-dev liblcms2-dev liblirc-dev liblzo2-dev \
             libmicrohttpd-dev libnfs-dev libogg-dev libpcre2-dev \
@@ -55,16 +80,21 @@ jobs:
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
             python3-dev
 
-      # ----------------- ccache -----------------
+      # ----------------- ccache（基于同一 commit SHA） -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-ubuntu24-v3-${{ hashFiles('kodi-src/.git/HEAD') }}
+          key: kodi-ccache-ubuntu24-v3-${{ steps.kodi_sha.outputs.sha }}
           max-size: 2G
+
+      # ----------------- 创建 artifacts 目录 -----------------
+      - name: Prepare artifacts dir
+        run: mkdir -p ~/artifacts
 
       # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
+          set -e
           cd kodi-src
           rm -rf build && mkdir build && cd build
 
@@ -88,11 +118,16 @@ jobs:
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
-          cpack -G DEB
+          # 生成 DEB
+          cpack -G DEB || (ls -la && echo "cpack failed"; exit 1)
+
+          # 把 Kodi 生成的 deb 收集到 artifacts
+          cp -v *.deb ~/artifacts/ || echo "No Kodi DEB found in $(pwd)"
 
       # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple addon
         run: |
+          set -e
           cd kodi-src/addons
           # 防止残留
           rm -rf pvr.iptvsimple
@@ -110,12 +145,10 @@ jobs:
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
-          cpack -G DEB
+          cpack -G DEB || (ls -la && echo "cpack (addon) failed"; exit 1)
 
-          # 统一收集所有 deb
-          mkdir -p ~/artifacts
-          cp ../../build/*.deb ~/artifacts/
-          cp *.deb ~/artifacts/
+          # 统一收集所有 deb（addon 的 deb 在当前目录）
+          cp -v *.deb ~/artifacts/ || echo "No addon DEB found in $(pwd)"
 
       # ----------------- 上传所有 DEB -----------------
       - name: Upload DEB packages
@@ -128,4 +161,4 @@ jobs:
       - name: List generated packages
         run: |
           echo "构建完成！生成的包如下："
-          ls -lh ~/artifacts/*.deb
+          ls -lh ~/artifacts/*.deb || echo "No packages found"
