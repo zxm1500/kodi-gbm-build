@@ -6,52 +6,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    env:
-      PKG_CONFIG_PATH: /home/runner/.local/lib/pkgconfig
-      LD_LIBRARY_PATH: /home/runner/.local/lib
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ----------------- Kodi 源码缓存 -----------------
+      # ----------------- 缓存 Kodi 源码 -----------------
       - name: Cache Kodi source
-        id: cache-kodi-src
+        id: cache-kodi
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-v4-${{ hashFiles('kodi-src/**/CMakeLists.txt') || runner.temp }}
-          restore-keys: kodi-src-21.3-Omega-v4-
+          key: kodi-src-21.3-Omega-v6-${{ hashFiles('kodi-src/**/CMakeLists.txt') || 'initial' }}
+          restore-keys: kodi-src-21.3-Omega-v6-
 
-      - name: Clone Kodi source (only when cache miss)
-        if: steps.cache-kodi-src.outputs.cache-hit != 'true'
+      - name: Clone Kodi source
+        if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: |
           git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 系统依赖（去掉 libfstrcmp-dev，靠 internal） -----------------
+      # ----------------- 安装依赖（关键补齐 libtool） -----------------
       - name: Install dependencies
         run: |
           sudo apt update -qq
           sudo apt install -y \
-            autoconf automake autopoint bison flex gettext \
-            cmake curl gcc g++ git pkg-config yasm nasm \
-            meson ninja-build swig unzip ccache \
-            build-essential libtool \
-            libasound2-dev libass-dev libbluray-dev libbz2-dev \
-            libcdio-dev libcec-dev libcurl4-openssl-dev \
-            libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
-            libfreetype6-dev libfribidi-dev libgcrypt20-dev \
-            libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
-            libgnutls28-dev libgpg-error-dev libiso9660-dev \
-            libjpeg-dev liblcms2-dev liblirc-dev liblzo2-dev \
-            libmicrohttpd-dev libnfs-dev libogg-dev libpcre2-dev \
-            libplist-dev libpng-dev libpulse-dev libshairplay-dev \
-            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
-            libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
-            libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
-            libxkbcommon-dev libxrandr-dev zlib1g-dev \
-            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
-            libdisplay-info-dev liburiparser-dev rapidjson-dev \
+            autoconf automake autopoint bison flex gettext libtool libtool-bin \
+            cmake curl gcc g++ git pkg-config yasm nasm meson ninja-build \
+            swig unzip ccache build-essential \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev libcdio-dev \
+            libcec-dev libcurl4-openssl-dev libdbus-1-dev libexiv2-dev \
+            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev \
+            libgcrypt20-dev libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
+            liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev \
+            libnfs-dev libogg-dev libpcre2-dev libplist-dev libpng-dev \
+            libpulse-dev libshairplay-dev libsmbclient-dev libspdlog-dev \
+            libsqlite3-dev libssl-dev libtag1-dev libtiff5-dev \
+            libtinyxml2-dev libudev-dev libva-dev libvdpau-dev \
+            libvorbis-dev libxml2-dev libxslt1-dev libxkbcommon-dev \
+            libxrandr-dev zlib1g-dev libwayland-dev libgbm-dev libdrm-dev \
+            libinput-dev libdisplay-info-dev liburiparser-dev rapidjson-dev \
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
             python3-dev
 
@@ -59,10 +53,10 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-ubuntu24-v4-${{ hashFiles('kodi-src/.git/HEAD') }}
+          key: kodi-ccache-v6-${{ hashFiles('kodi-src/.git/HEAD') }}
           max-size: 2G
 
-      # ----------------- 编译 Kodi GBM -----------------
+      # ----------------- 编译 Kodi GBM（核心修复） -----------------
       - name: Build Kodi GBM
         run: |
           cd kodi-src
@@ -83,7 +77,7 @@ jobs:
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DENABLE_INTERNAL_FSTRCMP=ON \  # 新增：内部构建 Fstrcmp
+            -DENABLE_INTERNAL_FSTRCMP=ON \     # 内部编译 fstrcmp
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
@@ -92,16 +86,14 @@ jobs:
           cpack -G DEB
 
       # ----------------- 编译 pvr.iptvsimple -----------------
-      - name: Build pvr.iptvsimple addon
+      - name: Build pvr.iptvsimple
         run: |
           cd kodi-src/addons
-          # 防止残留
           rm -rf pvr.iptvsimple
-          git clone --depth=1 --branch=Omega \
-            https://github.com/kodi-pvr/pvr.iptvsimple.git
+          git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-          mkdir -p pvr.iptvsimple/build
-          cd pvr.iptvsimple/build
+          cd pvr.iptvsimple
+          mkdir build && cd build
 
           cmake .. \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
@@ -113,20 +105,20 @@ jobs:
           make -j$(nproc)
           cpack -G DEB
 
-          # 统一收集所有 deb
+          # 收集所有 deb
           mkdir -p ~/artifacts
-          cp ../../build/*.deb ~/artifacts/ || true  # 忽略如果无文件
-          cp *.deb ~/artifacts/ || true
+          cp ../../build/*.deb ~/artifacts/ 2>/dev/null || true
+          cp *.deb ~/artifacts/
 
-      # ----------------- 上传所有 DEB -----------------
+      # ----------------- 上传 -----------------
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr.iptvsimple-ubuntu24.04-amd64
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04
           path: ~/artifacts/*.deb
-          if-no-files-found: warn  # 改成 warn，避免空上传失败
+          if-no-files-found: error
 
-      - name: List generated packages
+      - name: List packages
         run: |
-          echo "构建完成！生成的包如下："
-          ls -lh ~/artifacts/*.deb || echo "无 DEB 文件（检查日志）"
+          echo "构建成功！生成的包："
+          ls -lh ~/artifacts/*.deb
