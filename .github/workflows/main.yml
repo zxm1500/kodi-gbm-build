@@ -17,20 +17,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-ultimate
+          key: kodi-src-21.3-Omega-20251129-pcconfig-fix
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 启用 universe 仓库 + 安装 libpcre3-dev -----------------
-      - name: Enable universe and install libpcre3-dev
+      # ----------------- 启用 universe + 安装 libpcre3(-dev) -----------------
+      - name: Enable universe and install PCRE3
         run: |
-          # 启用 universe（Ubuntu 24.04 默认可能未全启）
           sudo add-apt-repository universe -y
           sudo apt update
-          sudo apt install -y libpcre3-dev
+          sudo apt install -y libpcre3 libpcre3-dev
 
       # ----------------- 安装其他依赖 -----------------
       - name: Install dependencies
@@ -56,19 +55,94 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-ultimate
+          key: kodi-ccache-20251129-pcconfig-fix
           max-size: 2G
 
-      # ----------------- 补丁：禁用 Kodi 的 FindPCRE.cmake -----------------
+      # ----------------- 关键修复：创建 pcre-config 脚本（模拟 Config 模式） -----------------
+      - name: Create pcre-config for CMake
+        run: |
+          # 创建可执行 pcre-config（基于 libpcre3-dev 路径，Kodi 论坛 fix）
+          sudo tee /usr/bin/pcre-config > /dev/null << 'EOF'
+          #!/bin/bash
+          # PCRE 8.x config script for Ubuntu 24.04 (version from libpcre3-dev)
+          prefix=/usr
+          exec_prefix=$prefix
+          libdir=$exec_prefix/lib
+          includedir=$prefix/include
+
+          usage()
+          {
+            cat <<EOF
+          Usage: pcre-config [OPTIONS]
+          Options:
+            [--prefix[=DIR]]
+            [--version]
+            [--libs]
+            [--libs-static]
+            [--cflags]
+          EOF
+            exit $1
+          }
+
+          if test $# -eq 0; then
+            usage 1 1>&2
+          fi
+
+          while test $# -gt 0; do
+            case "$1" in
+            # this is for the --version option
+            --version)
+              echo 8.39
+              exit 0
+              ;;
+            # this is for the --libs option
+            --libs)
+              echo -lpcrecpp -lpcre -lpcreposix
+              exit 0
+              ;;
+            # this is for the --libs-static option
+            --libs-static)
+              echo -Wl,--whole-archive -lpcrecpp -lpcre -lpcreposix -Wl,--no-whole-archive
+              exit 0
+              ;;
+            # this is for the --cflags option
+            --cflags)
+              echo -I/usr/include
+              exit 0
+              ;;
+            # this is for the --prefix option
+            --prefix)
+              echo $prefix
+              exit 0
+              ;;
+            --prefix=*)
+              # ignore any already set prefix, e.g. from autoconf
+              ;;
+            --help)
+              usage 0
+              ;;
+            *)
+              usage 1 1>&2
+              ;;
+            esac
+            shift
+          done
+          EOF
+          sudo chmod +x /usr/bin/pcre-config
+
+      # ----------------- 补丁：禁用 Kodi 的 FindPCRE.cmake（可选，但稳） -----------------
       - name: Patch FindPCRE.cmake
         run: |
-          mv kodi-src/cmake/modules/FindPCRE.cmake kodi-src/cmake/modules/FindPCRE.cmake.disabled
+          mv kodi-src/cmake/modules/FindPCRE.cmake kodi-src/cmake/modules/FindPCRE.cmake.disabled || true
 
       # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
           cd kodi-src
           rm -rf build && mkdir build && cd build
+
+          # 验证 pcre-config 可用
+          which pcre-config && pcre-config --version
 
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
@@ -121,10 +195,10 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-ultimate
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-pcconfig
           path: ~/artifacts/*.deb
 
       - name: List packages
         run: |
-          echo "构建大成功！生成的 DEB 包如下："
+          echo "构建成功！生成的 DEB 包："
           ls -lh ~/artifacts/*.deb
