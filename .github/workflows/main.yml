@@ -1,85 +1,122 @@
-name: Build Kodi GBM + PVR IPTV Simple for Ubuntu 24.04
-
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      PKG_CONFIG_PATH: /home/runner/.local/lib/pkgconfig
+      LD_LIBRARY_PATH: /home/runner/.local/lib
 
     steps:
-      - name: Checkout
+      - name: Checkout workflow repo
         uses: actions/checkout@v4
 
-      # ----------------- Kodi 源码缓存 -----------------
+      # 更健壮的：获取目标分支/标签的最新 commit SHA，用作缓存 key（带调试输出与回退）
+      - name: Get Kodi remote commit SHA
+        id: kodi_sha
+        run: |
+          set -euo pipefail
+          REPO="https://github.com/xbmc/xbmc.git"
+          BRANCH="21.3-Omega"
+
+          echo "=== git ls-remote (all refs) ==="
+          git ls-remote "$REPO" || true
+
+          echo "=== Looking for branch refs/heads/$BRANCH ==="
+          SHA=$(git ls-remote --heads "$REPO" "refs/heads/$BRANCH" | cut -f1)
+          if [ -n "$SHA" ]; then
+            echo "Found branch SHA: $SHA"
+          else
+            echo "Branch not found, trying tags with name $BRANCH ..."
+            SHA=$(git ls-remote --tags "$REPO" "refs/tags/$BRANCH" | cut -f1)
+            if [ -n "$SHA" ]; then
+              echo "Found tag SHA: $SHA"
+            fi
+          fi
+
+          if [ -z "$SHA" ]; then
+            echo "Branch/tag '$BRANCH' not found in $REPO."
+            echo "Listing a few heads and tags for debugging:"
+            git ls-remote --heads "$REPO" | sed -n '1,200p' || true
+            git ls-remote --tags "$REPO" | sed -n '1,200p' || true
+
+            # fallback: use a non-empty but unique key so the job continues (cache will not hit)
+            SHA="no-remote-sha-$(date +%s)"
+            echo "Using fallback SHA/key: $SHA"
+          fi
+
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      # ...其余 steps 保持不变（略）...
+
+      # ----------------- 源码缓存（基于远程 commit SHA） -----------------
       - name: Cache Kodi source
-        id: cache-kodi
+        id: cache-kodi-src
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-gtest-fix
-          restore-keys: kodi-src-21.3-Omega-
+          key: kodi-src-21.3-Omega-v3-${{ steps.kodi_sha.outputs.sha }}
+          restore-keys: |
+            kodi-src-21.3-Omega-v3-
 
-      - name: Clone Kodi source
-        if: steps.cache-kodi.outputs.cache-hit != 'true'
-        run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
-
-      # ----------------- 启用 universe + 安装 PCRE3 和 TinyXML -----------------
-      - name: Enable universe and install key deps (PCRE3 + TinyXML)
+      - name: Clone Kodi source (only when cache miss)
+        if: steps.cache-kodi-src.outputs.cache-hit != 'true'
         run: |
-          sudo add-apt-repository universe -y
-          sudo apt update
-          sudo apt install -y libpcre3 libpcre3-dev libtinyxml-dev
+          git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 安装其他依赖（包括 libgtest-dev 源码） -----------------
+      # 如果 cache 命中但目录不存在（极端情况），仍然确保目录存在
+      - name: Ensure kodi-src exists
+        if: steps.cache-kodi-src.outputs.cache-hit == 'true'
+        run: |
+          if [ ! -d kodi-src ]; then
+            echo "Cache reported hit but kodi-src missing; cloning as fallback"
+            git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
+          fi
+
+      # ----------------- 系统依赖（完整且补充必要打包/egl包） -----------------
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            autoconf automake autopoint bison flex gettext libtool libtool-bin \
-            cmake curl gcc g++ git pkg-config yasm nasm meson ninja-build swig unzip ccache build-essential \
-            libasound2-dev libass-dev libbluray-dev libbz2-dev libcdio-dev libcec-dev \
-            libcurl4-openssl-dev libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
-            libfreetype6-dev libfribidi-dev libgcrypt20-dev libgif-dev libgl1-mesa-dev \
-            libglu1-mesa-dev libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
-            liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev libnfs-dev libogg-dev \
-            libpcre2-dev libplist-dev libpng-dev libpulse-dev libshairplay-dev \
-            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev libtag1-dev \
-            libtiff5-dev libtinyxml2-dev libudev-dev libva-dev libvdpau-dev \
-            libvorbis-dev libxml2-dev libxslt1-dev libxkbcommon-dev libxrandr-dev \
-            zlib1g-dev libwayland-dev libgbm-dev libdrm-dev libinput-dev \
-            libdisplay-info-dev liburiparser-dev rapidjson-dev nlohmann-json3-dev \
-            flatbuffers-compiler libflatbuffers-dev python3-dev libgtest-dev
+          sudo apt update -qq
+          sudo apt install -y \
+            autoconf automake autopoint bison flex gettext \
+            cmake curl gcc g++ git pkg-config yasm nasm \
+            meson ninja-build swig unzip ccache \
+            build-essential libtool fakeroot dpkg-dev \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev \
+            libcdio-dev libcec-dev libcurl4-openssl-dev \
+            libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
+            libfreetype6-dev libfribidi-dev libgcrypt20-dev \
+            libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libegl1-mesa-dev libgles2-mesa-dev \
+            libgnutls28-dev libgpg-error-dev libiso9660-dev \
+            libjpeg-dev liblcms2-dev liblirc-dev liblzo2-dev \
+            libmicrohttpd-dev libnfs-dev libogg-dev libpcre2-dev \
+            libplist-dev libpng-dev libpulse-dev libshairplay-dev \
+            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
+            libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
+            libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
+            libxkbcommon-dev libxrandr-dev zlib1g-dev \
+            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
+            libdisplay-info-dev liburiparser-dev rapidjson-dev \
+            nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
+            python3-dev
 
-      # ----------------- 关键修复：手动编译 GTest 库（Ubuntu 24.04 必备） -----------------
-      - name: Compile and install GTest libraries
-        run: |
-          # 进入源码目录，创建 build 并编译（Stack Overflow / Ask Ubuntu fix）
-          sudo mkdir -p /usr/src/gtest/build && cd /usr/src/gtest/build
-          sudo cmake .. -DCMAKE_BUILD_TYPE=Release
-          sudo make -j$(nproc)
-          sudo make install  # 安装到 /usr/local/lib (CMake 会找到)
-          # 复制静态库到 /usr/lib（确保 FindGTest 找到）
-          sudo cp /usr/local/lib/*.a /usr/lib/
-          sudo ldconfig  # 更新库缓存
-
-      # ----------------- ccache -----------------
+      # ----------------- ccache（基于同一 commit SHA） -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-gtest-fix
+          key: kodi-ccache-ubuntu24-v3-${{ steps.kodi_sha.outputs.sha }}
           max-size: 2G
 
-      # ----------------- 验证 GTest、TinyXML 和 PCRE -----------------
-      - name: Verify dependencies
-        run: |
-          ls /usr/lib/libgtest*  # GTest 库文件
-          ls /usr/include/tinyxml.h  # TinyXML 头文件
-          pcre-config --version  # PCRE 8.39
+      # ----------------- 创建 artifacts 目录 -----------------
+      - name: Prepare artifacts dir
+        run: mkdir -p ~/artifacts
 
-      # ----------------- 编译 Kodi GBM（不 mv FindPCRE，使用模块模式） -----------------
+      # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
+          set -e
           cd kodi-src
           rm -rf build && mkdir build && cd build
 
@@ -98,23 +135,29 @@ jobs:
             -DENABLE_INTERNAL_FFMPEG=ON \
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DENABLE_INTERNAL_FSTRCMP=ON \
-            -DENABLE_PCRE2=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
-          cpack -G DEB
+          # 生成 DEB
+          cpack -G DEB || (ls -la && echo "cpack failed"; exit 1)
+
+          # 把 Kodi 生成的 deb 收集到 artifacts
+          cp -v *.deb ~/artifacts/ || echo "No Kodi DEB found in $(pwd)"
 
       # ----------------- 编译 pvr.iptvsimple -----------------
-      - name: Build pvr.iptvsimple
+      - name: Build pvr.iptvsimple addon
         run: |
+          set -e
           cd kodi-src/addons
+          # 防止残留
           rm -rf pvr.iptvsimple
-          git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
-          cd pvr.iptvsimple
-          mkdir build && cd build
+          git clone --depth=1 --branch=Omega \
+            https://github.com/kodi-pvr/pvr.iptvsimple.git
+
+          mkdir -p pvr.iptvsimple/build
+          cd pvr.iptvsimple/build
 
           cmake .. \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
@@ -124,20 +167,20 @@ jobs:
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
-          cpack -G DEB
+          cpack -G DEB || (ls -la && echo "cpack (addon) failed"; exit 1)
 
-          mkdir -p ~/artifacts
-          cp ../../build/*.deb ~/artifacts/ 2>/dev/null || true
-          cp *.deb ~/artifacts/
+          # 统一收集所有 deb（addon 的 deb 在当前目录）
+          cp -v *.deb ~/artifacts/ || echo "No addon DEB found in $(pwd)"
 
-      # ----------------- 上传 -----------------
+      # ----------------- 上传所有 DEB -----------------
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-gtest
+          name: kodi-gbm-pvr.iptvsimple-ubuntu24.04-amd64
           path: ~/artifacts/*.deb
+          if-no-files-found: error
 
-      - name: List packages
+      - name: List generated packages
         run: |
-          echo "构建成功！生成的 DEB 包如下："
-          ls -lh ~/artifacts/*.deb
+          echo "构建完成！生成的包如下："
+          ls -lh ~/artifacts/*.deb || echo "No packages found"
