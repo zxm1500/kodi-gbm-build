@@ -17,14 +17,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20250821-final
+          key: kodi-src-21.3-Omega-20251129-final
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 安装所有依赖（一次写完） -----------------
+      # ----------------- 安装 PCRE3（关键修复：从 22.04 仓库拉） -----------------
+      - name: Install libpcre3-dev for Kodi build
+        run: |
+          # 添加 Ubuntu 22.04 old-releases 源（只为 PCRE1）
+          echo "deb http://old-releases.ubuntu.com/ubuntu jammy main universe" | sudo tee /etc/apt/sources.list.d/jammy-pcre.list
+          sudo apt update
+          sudo apt install -y libpcre3-dev
+
+      # ----------------- 安装其他依赖 -----------------
       - name: Install dependencies
         run: |
           sudo apt update
@@ -48,16 +56,15 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20250821-final
+          key: kodi-ccache-20251129-final
           max-size: 2G
 
-      # ----------------- 关键补丁：彻底干掉有 bug 的 FindPCRE.cmake -----------------
-      - name: Patch broken FindPCRE.cmake (Ubuntu 24.04 必备)
+      # ----------------- 补丁：禁用 Kodi 的 FindPCRE.cmake -----------------
+      - name: Patch FindPCRE.cmake
         run: |
-          # 把 Kodi 自带的残废 FindPCRE.cmake 改名，让 CMake 只能找到系统的 FindPCRE2.cmake
           mv kodi-src/cmake/modules/FindPCRE.cmake kodi-src/cmake/modules/FindPCRE.cmake.disabled
 
-      # ----------------- 编译 Kodi GBM（所有坑已填平） -----------------
+      # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
           cd kodi-src
@@ -79,6 +86,7 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_FSTRCMP=ON \
+            -DENABLE_PCRE2=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
@@ -113,10 +121,10 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-final
           path: ~/artifacts/*.deb
 
       - name: List packages
         run: |
-          echo "大功告成！生成的 DEB 包如下："
+          echo "构建成功！生成的包："
           ls -lh ~/artifacts/*.deb
