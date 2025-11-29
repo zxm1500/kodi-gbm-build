@@ -158,7 +158,7 @@ jobs:
       
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=/usr/local \  # 使用系统安装路径
+            -DCMAKE_PREFIX_PATH=/usr/local \
             -DCPACK_GENERATOR=DEB
       
           make -j$(nproc)
