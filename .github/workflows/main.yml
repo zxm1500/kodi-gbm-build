@@ -7,65 +7,62 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     env:
-      # 让所有步骤都能继承这两个路径
       PKG_CONFIG_PATH: /home/runner/.local/lib/pkgconfig
       LD_LIBRARY_PATH: /home/runner/.local/lib
 
     steps:
-      # ----------------- 1. Checkout -----------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ----------------- 2. Cache Kodi source -----------------
+      # ----------------- Kodi 源码缓存 -----------------
       - name: Cache Kodi source
         id: cache-kodi-src
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-${{ hashFiles('**/CMakeLists.txt') }}
-          restore-keys: kodi-src-
+          key: kodi-src-21.3-Omega-v3-${{ hashFiles('kodi-src/**/CMakeLists.txt') || runner.temp }}
+          restore-keys: kodi-src-21.3-Omega-v3-
 
-      - name: Clone Kodi source (if cache miss)
+      - name: Clone Kodi source (only when cache miss)
         if: steps.cache-kodi-src.outputs.cache-hit != 'true'
         run: |
           git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 3. Install system dependencies (完整版) -----------------
+      # ----------------- 系统依赖（完整且精简） -----------------
       - name: Install dependencies
         run: |
-          sudo apt update && sudo apt upgrade -y
+          sudo apt update -qq
           sudo apt install -y \
             autoconf automake autopoint bison flex gettext \
             cmake curl gcc g++ git pkg-config yasm nasm \
             meson ninja-build swig unzip ccache \
             build-essential libtool \
-            libasound2-dev libass-dev libavahi-client-dev libavahi-common-dev \
-            libbluray-dev libbz2-dev libcdio-dev libcec-dev \
-            libcurl4-openssl-dev libdbus-1-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfreetype6-dev libfribidi-dev \
-            libgcrypt20-dev libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
-            libgnutls28-dev libgpg-error-dev libiso9660-dev libjpeg-dev \
-            liblcms2-dev liblirc-dev liblzo2-dev libmicrohttpd-dev \
-            libmysqlclient-dev libnfs-dev libogg-dev libpcre2-dev \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev \
+            libcdio-dev libcec-dev libcurl4-openssl-dev \
+            libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
+            libfreetype6-dev libfribidi-dev libgcrypt20-dev \
+            libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libgnutls28-dev libgpg-error-dev libiso9660-dev \
+            libjpeg-dev liblcms2-dev liblirc-dev liblzo2-dev \
+            libmicrohttpd-dev libnfs-dev libogg-dev libpcre2-dev \
             libplist-dev libpng-dev libpulse-dev libshairplay-dev \
             libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
             libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
             libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
             libxkbcommon-dev libxrandr-dev zlib1g-dev \
-            libwayland-dev libwayland-egl-backend-dev wayland-protocols \
-            libgbm-dev libdrm-dev libinput-dev libdisplay-info-dev \
-            liburiparser-dev rapidjson-dev nlohmann-json3-dev \
-            flatbuffers-compiler libflatbuffers-dev \
-            python3-dev python3-pip
+            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
+            libdisplay-info-dev liburiparser-dev rapidjson-dev \
+            nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
+            python3-dev
 
-      # ----------------- 4. Setup ccache -----------------
+      # ----------------- ccache -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-ubuntu24-${{ hashFiles('kodi-src/.git/HEAD') }}
+          key: kodi-ccache-ubuntu24-v3-${{ hashFiles('kodi-src/.git/HEAD') }}
           max-size: 2G
 
-      # ----------------- 5. Build & Install Kodi GBM -----------------
+      # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
           cd kodi-src
@@ -93,45 +90,42 @@ jobs:
           make -j$(nproc)
           cpack -G DEB
 
-      # ----------------- 6. Build pvr.iptvsimple (官方推荐方式) -----------------
-      - name: Build pvr.iptvsimple add-on
+      # ----------------- 编译 pvr.iptvsimple -----------------
+      - name: Build pvr.iptvsimple addon
         run: |
-          # 直接在 Kodi 源码里建 addon（最稳）
-          cd kodi-src
-          mkdir -p addons
-          cd addons
+          cd kodi-src/addons
+          # 防止残留
+          rm -rf pvr.iptvsimple
+          git clone --depth=1 --branch=Omega \
+            https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-          # 克最新 Omega 分支
-          git clone --depth=1 --branch Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
-
-          mkdir -p pvr.iptvsimple/build && cd pvr.iptvsimple/build
+          mkdir -p pvr.iptvsimple/build
+          cd pvr.iptvsimple/build
 
           cmake .. \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
             -DCMAKE_BUILD_TYPE=Release \
             -DADDON_SRC_PREFIX=../.. \
             -DCMAKE_INSTALL_PREFIX=../../build/install \
-            -DPACKAGE_ZIP=1 \
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
           cpack -G DEB
 
-          # 收集生成的 DEB
+          # 统一收集所有 deb
           mkdir -p ~/artifacts
-          cp kodi*.deb ~/artifacts/
-          cp pvr.iptvsimple*.deb ~/artifacts/
+          cp ../../build/*.deb ~/artifacts/
+          cp *.deb ~/artifacts/
 
-      # ----------------- 7. Upload all DEB packages -----------------
-      - name: Upload DEB Artifacts
+      # ----------------- 上传所有 DEB -----------------
+      - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr.iptvsimple-ubuntu24.04
+          name: kodi-gbm-pvr.iptvsimple-ubuntu24.04-amd64
           path: ~/artifacts/*.deb
           if-no-files-found: error
 
-      # ----------------- 8. Show generated packages -----------------
       - name: List generated packages
         run: |
-          echo "=== 生成的 DEB 包 ==="
+          echo "构建完成！生成的包如下："
           ls -lh ~/artifacts/*.deb
