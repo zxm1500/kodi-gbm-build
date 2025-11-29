@@ -1,123 +1,125 @@
-name: Build Kodi GBM for Ubuntu 24.04
+name: Build Kodi GBM + PVR IPTV Simple for Ubuntu 24.04
 
 on:
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:  # 手动触发
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
     steps:
-      
-      - name: Checkout this repository
-        uses: actions/checkout@v4
+    # ----------------- Step 1: Checkout -----------------
+    - name: Checkout this repository
+      uses: actions/checkout@v4
 
-      # 1. 缓存 Kodi 源码
-      - name: Cache Kodi source
-        id: cache-kodi-src
-        uses: actions/cache@v4
-        with:
-          path: kodi-src
-          key: kodi-src-21.3-Omega
-          restore-keys: |
-            kodi-src-
+    # ----------------- Step 2: Cache Kodi source -----------------
+    - name: Cache Kodi source
+      id: cache-kodi-src
+      uses: actions/cache@v4
+      with:
+        path: kodi-src
+        key: kodi-src-21.3-Omega
+        restore-keys: kodi-src-
 
-      # 2. 仅在缓存未命中时才 clone
-      - name: Clone Kodi source
-        if: steps.cache-kodi-src.outputs.cache-hit != 'true'
-        run: |
-          git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
+    - name: Clone Kodi source
+      if: steps.cache-kodi-src.outputs.cache-hit != 'true'
+      run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # -------- Cache APT --------
-      - name: Cache APT packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            /var/lib/apt/lists
-            /var/cache/apt/archives
-          key: apt-cache-ubuntu-24.04
+    # ----------------- Step 3: Install Dependencies -----------------
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          autoconf automake autopoint gettext cmake curl \
+          gcc g++ flatbuffers-compiler libflatbuffers-dev \
+          libasound2-dev libass-dev libbluray-dev libbz2-dev \
+          libcdio-dev libcec-dev libcurl4-openssl-dev \
+          libdbus-1-dev libegl1-mesa-dev libexiv2-dev \
+          libflac-dev libfontconfig-dev libfreetype6-dev \
+          libfribidi-dev libgcrypt-dev libgif-dev libgl1-mesa-dev \
+          libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
+          libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev \
+          liblzo2-dev libmicrohttpd-dev libnfs-dev libogg-dev \
+          libpcre2-dev libplist-dev libpng-dev libshairplay-dev \
+          libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
+          libtag1-dev libtiff-dev libtinyxml2-dev libtool libudev-dev \
+          libunistring-dev libva-dev libvdpau-dev libvorbis-dev \
+          libxkbcommon-dev libxrandr-dev libxslt-dev libxt-dev \
+          meson nasm ninja-build python3-dev swig unzip uuid-dev \
+          zlib1g-dev nlohmann-json3-dev libgbm-dev libdrm-dev libinput-dev \
+          build-essential pkg-config rapidjson-dev libfstrcmp-dev libpcre3 libpcre3-dev \
+          libtinyxml-dev libgtest-dev ccache
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            autoconf automake autopoint gettext cmake curl \
-            gcc g++ flatbuffers-compiler libflatbuffers-dev \
-            libasound2-dev libass-dev libbluray-dev libbz2-dev \
-            libcdio-dev libcec-dev libcurl4-openssl-dev \
-            libdbus-1-dev libegl1-mesa-dev libexiv2-dev \
-            libflac-dev libfontconfig-dev libfreetype6-dev \
-            libfribidi-dev libgcrypt-dev libgif-dev libgl1-mesa-dev \
-            libglu1-mesa-dev libgnutls28-dev libgpg-error-dev \
-            libiso9660-dev libjpeg-dev liblcms2-dev liblirc-dev \
-            liblzo2-dev libmicrohttpd-dev libnfs-dev libogg-dev \
-            libpcre2-dev libplist-dev libpng-dev libshairplay-dev \
-            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
-            libtag1-dev libtiff-dev libtinyxml2-dev libtool libudev-dev \
-            libunistring-dev libva-dev libvdpau-dev libvorbis-dev \
-            libxkbcommon-dev libxrandr-dev libxslt-dev libxt-dev \
-            meson nasm ninja-build python3-dev swig unzip uuid-dev \
-            zlib1g-dev nlohmann-json3-dev libgbm-dev libdrm-dev libinput-dev \
-            build-essential pkg-config rapidjson-dev libfstrcmp-dev libpcre3 libpcre3-dev \
-            libtinyxml-dev libgtest-dev
-            
-      # 4. 缓存 ccache
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2.9
-        with:
-          key: kodi-ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
-          max-size: 2G
+    # ----------------- Step 4: Setup ccache -----------------
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2.9
+      with:
+        key: kodi-ccache-${{ runner.os }}-${{ hashFiles('kodi-src/.git/HEAD') }}
+        max-size: 2G
 
-      # 5. 构建libdisplay-info
-      - name: Build libdisplay-info
-        run: |
-          git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
-          cd libdisplay-info
-          meson setup build
-          meson compile -C build
-          sudo meson install -C build
+    # ----------------- Step 5: Build libdisplay-info -----------------
+    - name: Build libdisplay-info
+      run: |
+        git clone https://gitlab.freedesktop.org/emersion/libdisplay-info.git
+        cd libdisplay-info
+        meson setup build --prefix=$HOME/.local --buildtype=release
+        meson compile -C build
+        meson install -C build
 
-      - name: Configure Kodi GBM
-        run: |
-          cd kodi-src
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCORE_PLATFORM_NAME=gbm \
-            -DAPP_RENDER_SYSTEM=gles \
-            -DENABLE_OPENGL=OFF \
-            -DENABLE_GLX=OFF \
-            -DENABLE_VAAPI=OFF \
-            -DENABLE_VDPAU=OFF \
-            -DENABLE_X11=OFF \
-            -DENABLE_PVR=ON \
-            -DWITH_PVR_ADDONS=ON \
-            -DENABLE_INTERNAL_FFMPEG=ON \
-            -DENABLE_INTERNAL_DAV1D=ON \
-            -DENABLE_INTERNAL_FLATBUFFERS=ON \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCPACK_GENERATOR=DEB
-      
-      - name: Build Kodi
-        run: |
-          cd kodi-src/build
-          make -j$(nproc)
+    # ----------------- Step 6: Configure and Build Kodi GBM -----------------
+    - name: Configure and Build Kodi GBM
+      run: |
+        export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+        cd kodi-src
+        mkdir -p build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCORE_PLATFORM_NAME=gbm \
+          -DAPP_RENDER_SYSTEM=gles \
+          -DENABLE_OPENGL=OFF \
+          -DENABLE_GLX=OFF \
+          -DENABLE_VAAPI=OFF \
+          -DENABLE_VDPAU=OFF \
+          -DENABLE_X11=OFF \
+          -DENABLE_PVR=ON \
+          -DWITH_PVR_ADDONS=ON \
+          -DENABLE_INTERNAL_FFMPEG=ON \
+          -DENABLE_INTERNAL_DAV1D=ON \
+          -DENABLE_INTERNAL_FLATBUFFERS=ON \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DCPACK_GENERATOR=DEB
+        make -j$(nproc)
+        cpack -G DEB
 
-      - name: Package Kodi
-        run: |
-          cd kodi-src/build
-          cpack -G DEB
-          mkdir -p ../../artifacts
-          echo "Listing generated packages:"
-          ls -la packages/
-          cp packages/*.deb ../../artifacts/ || true
-          echo "Artifacts copied:"
-          ls -la ../../artifacts/
+    # ----------------- Step 7: Build PVR IPTV Simple as DEB -----------------
+    - name: Build PVR IPTV Simple DEB
+      run: |
+        export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+        git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git /tmp/xbmc
+        cd /tmp/xbmc/addons/pvr.iptvsimple
+        mkdir -p build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DKODI_ROOT_DIR=$HOME/.local/lib/kodi \
+          -DCPACK_GENERATOR=DEB \
+          -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)
+        cpack -G DEB
+        mkdir -p ~/pvr-artifacts
+        cp *.deb ~/pvr-artifacts/
 
-      - name: Upload DEB package
-        uses: actions/upload-artifact@v4
-        with:
-          name: kodi-gbm-ubuntu24.04
-          path: artifacts/
+    # ----------------- Step 8: Upload DEB Packages -----------------
+    - name: Upload Kodi DEB package
+      uses: actions/upload-artifact@v4
+      with:
+        name: kodi-gbm-ubuntu24.04
+        path: kodi-src/build/*.deb
+
+    - name: Upload PVR IPTV Simple DEB package
+      uses: actions/upload-artifact@v4
+      with:
+        name: kodi-pvr-iptvsimple-ubuntu24.04
+        path: ~/pvr-artifacts/*.deb
