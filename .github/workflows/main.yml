@@ -123,7 +123,7 @@ jobs:
 
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=${PWD}/install \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_OPENGL=OFF \
@@ -141,19 +141,10 @@ jobs:
             -DCPACK_GENERATOR=DEB
 
           make -j$(nproc)
+          sudo make install  # 关键：实际安装到系统
           # 生成 DEB
           cpack -G DEB || (ls -la && echo "cpack failed"; exit 1)
-
-          # 把 Kodi 生成的 deb 收集到 artifacts
           cp -v *.deb ~/artifacts/ || echo "No Kodi DEB found in $(pwd)"
-
-      # ----------------- 安装 Kodi（关键修复） -----------------
-      - name: Install Kodi to provide KodiConfig.cmake
-        run: |
-          cd kodi-src/build
-          sudo make install || true
-          # 验证 KodiConfig.cmake 是否存在
-          find . -name "*Kodi*Config.cmake" -o -name "*kodi*config.cmake" | head -5
 
       # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple addon
