@@ -17,21 +17,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-findpcre-fix
+          key: kodi-src-21.3-Omega-20251129-tinyxml-fix
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 启用 universe + 安装 PCRE3（提供头文件/库） -----------------
-      - name: Enable universe and install PCRE3
+      # ----------------- 启用 universe + 安装 PCRE3 和 TinyXML -----------------
+      - name: Enable universe and install key deps (PCRE3 + TinyXML)
         run: |
           sudo add-apt-repository universe -y
           sudo apt update
-          sudo apt install -y libpcre3 libpcre3-dev
+          sudo apt install -y libpcre3 libpcre3-dev libtinyxml-dev
 
-      # ----------------- 安装其他依赖 -----------------
+      # ----------------- 安装其他依赖（完整列表） -----------------
       - name: Install dependencies
         run: |
           sudo apt update
@@ -55,23 +55,18 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-findpcre-fix
+          key: kodi-ccache-20251129-tinyxml-fix
           max-size: 2G
 
-      # ----------------- 验证 pcre-config 和头文件（系统自带） -----------------
-      - name: Verify PCRE installation
+      # ----------------- 验证 TinyXML 和 PCRE -----------------
+      - name: Verify TinyXML and PCRE
         run: |
-          which pcre-config
-          pcre-config --version  # 应输出 8.39
-          pkg-config --exists pcre && echo "PCRE pkg-config OK" || echo "PCRE pkg-config missing (OK, use Find module)"
-          ls /usr/include/pcre.h  # 确认头文件存在
+          pkg-config --exists tinyxml && echo "TinyXML pkg-config OK" || echo "TinyXML no pkg-config (OK, Find module handles)"
+          ls /usr/include/tinyxml.h  # 头文件
+          ls /usr/lib/x86_64-linux-gnu/libtinyxml*  # 库文件
+          pcre-config --version  # 8.39
 
-      # ----------------- 关键修复：不 mv FindPCRE.cmake，让 Kodi 用模块模式找头文件/库 -----------------
-      - name: No patch for FindPCRE (use Kodi's module mode)
-        run: |
-          echo "Keeping FindPCRE.cmake intact - it will find pcre.h and libpcre from libpcre3-dev"
-
-      # ----------------- 编译 Kodi GBM -----------------
+      # ----------------- 编译 Kodi GBM（不 mv FindPCRE，使用模块模式） -----------------
       - name: Build Kodi GBM
         run: |
           cd kodi-src
@@ -128,7 +123,7 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-findpcre
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-tinyxml
           path: ~/artifacts/*.deb
 
       - name: List packages
