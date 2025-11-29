@@ -65,6 +65,9 @@ jobs:
         meson setup build --prefix=$HOME/.local --buildtype=release
         meson compile -C build
         meson install -C build
+           # 创建 libdisplay-info.so 软链接
+        cd $HOME/.local/lib
+        ln -sf libdisplay-info.so.4 libdisplay-info.so
 
     # ----------------- Step 6: Configure and Build Kodi GBM -----------------
     - name: Configure and Build Kodi GBM
