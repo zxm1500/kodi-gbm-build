@@ -17,7 +17,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20251129-tinyxml-fix
+          key: kodi-src-21.3-Omega-20251129-gtest-fix
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
@@ -31,7 +31,7 @@ jobs:
           sudo apt update
           sudo apt install -y libpcre3 libpcre3-dev libtinyxml-dev
 
-      # ----------------- 安装其他依赖（完整列表） -----------------
+      # ----------------- 安装其他依赖（包括 libgtest-dev 源码） -----------------
       - name: Install dependencies
         run: |
           sudo apt update
@@ -49,22 +49,33 @@ jobs:
             libvorbis-dev libxml2-dev libxslt1-dev libxkbcommon-dev libxrandr-dev \
             zlib1g-dev libwayland-dev libgbm-dev libdrm-dev libinput-dev \
             libdisplay-info-dev liburiparser-dev rapidjson-dev nlohmann-json3-dev \
-            flatbuffers-compiler libflatbuffers-dev python3-dev
+            flatbuffers-compiler libflatbuffers-dev python3-dev libgtest-dev
+
+      # ----------------- 关键修复：手动编译 GTest 库（Ubuntu 24.04 必备） -----------------
+      - name: Compile and install GTest libraries
+        run: |
+          # 进入源码目录，创建 build 并编译（Stack Overflow / Ask Ubuntu fix）
+          sudo mkdir -p /usr/src/gtest/build && cd /usr/src/gtest/build
+          sudo cmake .. -DCMAKE_BUILD_TYPE=Release
+          sudo make -j$(nproc)
+          sudo make install  # 安装到 /usr/local/lib (CMake 会找到)
+          # 复制静态库到 /usr/lib（确保 FindGTest 找到）
+          sudo cp /usr/local/lib/*.a /usr/lib/
+          sudo ldconfig  # 更新库缓存
 
       # ----------------- ccache -----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20251129-tinyxml-fix
+          key: kodi-ccache-20251129-gtest-fix
           max-size: 2G
 
-      # ----------------- 验证 TinyXML 和 PCRE -----------------
-      - name: Verify TinyXML and PCRE
+      # ----------------- 验证 GTest、TinyXML 和 PCRE -----------------
+      - name: Verify dependencies
         run: |
-          pkg-config --exists tinyxml && echo "TinyXML pkg-config OK" || echo "TinyXML no pkg-config (OK, Find module handles)"
-          ls /usr/include/tinyxml.h  # 头文件
-          ls /usr/lib/x86_64-linux-gnu/libtinyxml*  # 库文件
-          pcre-config --version  # 8.39
+          ls /usr/lib/libgtest*  # GTest 库文件
+          ls /usr/include/tinyxml.h  # TinyXML 头文件
+          pcre-config --version  # PCRE 8.39
 
       # ----------------- 编译 Kodi GBM（不 mv FindPCRE，使用模块模式） -----------------
       - name: Build Kodi GBM
@@ -123,7 +134,7 @@ jobs:
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-tinyxml
+          name: kodi-gbm-pvr-iptvsimple-ubuntu24.04-gtest
           path: ~/artifacts/*.deb
 
       - name: List packages
