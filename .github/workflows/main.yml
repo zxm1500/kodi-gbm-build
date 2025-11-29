@@ -90,7 +90,9 @@ jobs:
           -DENABLE_INTERNAL_FLATBUFFERS=ON \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DCPACK_GENERATOR=DEB 
+          -DCPACK_GENERATOR=DEB \
+          -DLIBDISPLAYINFO_INCLUDE_DIR=$HOME/.local/include \
+          -DLIBDISPLAYINFO_LIBRARY=$HOME/.local/lib/libdisplay-info.so
         make -j$(nproc)
         cpack -G DEB
 
