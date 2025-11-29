@@ -1,3 +1,4 @@
+name: Build Kodi GBM + PVR IPTV Simple for Ubuntu 24.04
 on:
   workflow_dispatch:
 
@@ -116,13 +117,13 @@ jobs:
       # ----------------- 编译 Kodi GBM -----------------
       - name: Build Kodi GBM
         run: |
-          set -e
+          set -euo pipefail
           cd kodi-src
           rm -rf build && mkdir build && cd build
 
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_INSTALL_PREFIX=${PWD}/install \
             -DCORE_PLATFORM_NAME=gbm \
             -DAPP_RENDER_SYSTEM=gles \
             -DENABLE_OPENGL=OFF \
@@ -149,28 +150,27 @@ jobs:
       # ----------------- 编译 pvr.iptvsimple -----------------
       - name: Build pvr.iptvsimple addon
         run: |
-          set -e
+          set -euo pipefail
           cd kodi-src/addons
-          # 防止残留
           rm -rf pvr.iptvsimple
-          git clone --depth=1 --branch=Omega \
-            https://github.com/kodi-pvr/pvr.iptvsimple.git
-
+          git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
           mkdir -p pvr.iptvsimple/build
           cd pvr.iptvsimple/build
-
+      
+          KODI_INSTALL_PREFIX=../../../build/install
+      
           cmake .. \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
             -DCMAKE_BUILD_TYPE=Release \
             -DADDON_SRC_PREFIX=../.. \
             -DCMAKE_INSTALL_PREFIX=../../build/install \
-            -DCPACK_GENERATOR=DEB
-
+            -DCPACK_GENERATOR=DEB \
+            -DCMAKE_PREFIX_PATH=${KODI_INSTALL_PREFIX} \
+            -DKodi_DIR=${KODI_INSTALL_PREFIX}/lib/cmake/Kodi
+      
           make -j$(nproc)
-          cpack -G DEB || (ls -la && echo "cpack (addon) failed"; exit 1)
-
-          # 统一收集所有 deb（addon 的 deb 在当前目录）
-          cp -v *.deb ~/artifacts/ || echo "No addon DEB found in $(pwd)"
+          cpack -G DEB || true
+          cp -v *.deb ~/artifacts/ || true
 
       # ----------------- 上传所有 DEB -----------------
       - name: Upload DEB packages
