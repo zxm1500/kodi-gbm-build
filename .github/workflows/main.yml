@@ -150,10 +150,7 @@ jobs:
       - name: Build pvr.iptvsimple addon
         run: |
           set -euo pipefail
-          cd kodi-src/build
-          KODI_INSTALL_PREFIX="${PWD}/install"
-          
-          cd ../addons
+          cd kodi-src/addons
           rm -rf pvr.iptvsimple
           git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
           mkdir -p pvr.iptvsimple/build
@@ -161,8 +158,7 @@ jobs:
       
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH=${KODI_INSTALL_PREFIX} \
-            -DKodi_DIR=${KODI_INSTALL_PREFIX}/lib/cmake/Kodi \
+            -DCMAKE_PREFIX_PATH=/usr/local \  # 使用系统安装路径
             -DCPACK_GENERATOR=DEB
       
           make -j$(nproc)
