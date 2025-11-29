@@ -26,7 +26,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt update -qq
+          sudo apt update
           sudo apt install -y \
             autoconf automake autopoint bison flex gettext libtool libtool-bin \
             cmake curl gcc g++ git pkg-config yasm nasm meson ninja-build \
