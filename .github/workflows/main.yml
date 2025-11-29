@@ -100,7 +100,7 @@ jobs:
             libwayland-dev libgbm-dev libdrm-dev libinput-dev \
             libdisplay-info-dev liburiparser-dev rapidjson-dev \
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev \
-            python3-dev libfstrcmp-dev libpcre3 libpcre3-dev libtinyxml-dev libgtest-dev
+            python3-dev libfstrcmp-dev libpcre3 libpcre3-dev libtinyxml-dev libgtest-dev libunistring-dev
 
       # ----------------- ccache（基于同一 commit SHA） -----------------
       - name: Setup ccache
