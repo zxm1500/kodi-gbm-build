@@ -17,15 +17,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: kodi-src
-          key: kodi-src-21.3-Omega-20250820
+          key: kodi-src-21.3-Omega-20250821-final
           restore-keys: kodi-src-21.3-Omega-
 
       - name: Clone Kodi source
         if: steps.cache-kodi.outputs.cache-hit != 'true'
         run: git clone --depth=1 --branch=21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ----------------- 安装依赖（一次性写全，绝不换行炸裂） -----------------
-      - name: Install all dependencies
+      # ----------------- 安装所有依赖（一次写完） -----------------
+      - name: Install dependencies
         run: |
           sudo apt update
           sudo DEBIAN_FRONTEND=noninteractive apt install -y \
@@ -48,8 +48,14 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
-          key: kodi-ccache-20250820
+          key: kodi-ccache-20250821-final
           max-size: 2G
+
+      # ----------------- 关键补丁：彻底干掉有 bug 的 FindPCRE.cmake -----------------
+      - name: Patch broken FindPCRE.cmake (Ubuntu 24.04 必备)
+        run: |
+          # 把 Kodi 自带的残废 FindPCRE.cmake 改名，让 CMake 只能找到系统的 FindPCRE2.cmake
+          mv kodi-src/cmake/modules/FindPCRE.cmake kodi-src/cmake/modules/FindPCRE.cmake.disabled
 
       # ----------------- 编译 Kodi GBM（所有坑已填平） -----------------
       - name: Build Kodi GBM
@@ -73,7 +79,6 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_INTERNAL_FSTRCMP=ON \
-            -DENABLE_PCRE2=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCPACK_GENERATOR=DEB
@@ -113,5 +118,5 @@ jobs:
 
       - name: List packages
         run: |
-          echo "全部构建成功！生成的包如下："
+          echo "大功告成！生成的 DEB 包如下："
           ls -lh ~/artifacts/*.deb
