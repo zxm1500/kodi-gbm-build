@@ -106,23 +106,21 @@ jobs:
         run: |
           git clone --depth 1 --branch 21.11.0-Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-      - name: Build pvr.iptvsimple addon (use kodi-src)
+      - name: Build pvr.iptvsimple
         run: |
-          # 进入 addon 的 build 目录（相对于工作区根）
-          mkdir -p pvr.iptvsimple/build
-          cd pvr.iptvsimple/build
+          echo "=== Copy addon source into Kodi tree ==="
+          cp -r pvr.iptvsimple kodi-src/
 
-          # 使用 kodi-src 下的 cmake/addons 来配置 addon 构建环境
-          cmake -G Ninja \
+          cd kodi-build
+          cmake \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
-            -DADDON_SRC_PREFIX=../../kodi-src \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=../../kodi-src/addons_install \
+            -DADDON_SRC_PREFIX=../kodi-src \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_INSTALL_PREFIX=../kodi-src/addons \
             -DPACKAGE_ZIP=1 \
-            ../../kodi-src/cmake/addons
+            ../kodi-src/cmake/addons
 
-          # 用 ninja 构建（ninja 会执行 install 操作并将文件放到 DCMAKE_INSTALL_PREFIX 指向的目录）
-          ninja
+          make -j$(nproc)
 
           # 列出可能的生成位置，便于调试
           echo "=== Search possible zip locations ==="
