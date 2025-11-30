@@ -1,4 +1,4 @@
-name: Build Kodi 21.3-Omega GBM + DEB for Ubuntu 24.04
+name: Build Kodi 21.3-Omega GBM + PVR IPTV Simple
 
 on:
   workflow_dispatch:
@@ -6,15 +6,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v4
 
-      # 直接用固定 tag，省去一切缓存和 sha 麻烦
+      # ====== 1. Clone Kodi ======
       - name: Clone Kodi 21.3-Omega
         run: |
           git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      - name: 安装完整依赖（精简但足够）
+      # ====== 2. Install Dependencies ======
+      - name: Install dependencies for Kodi + Addons
         run: |
           sudo apt update -qq
           sudo apt install -y \
@@ -39,18 +41,18 @@ jobs:
             libwayland-dev libgbm-dev libdrm-dev libinput-dev \
             libdisplay-info-dev liburiparser-dev rapidjson-dev \
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev libpugixml-dev \
-            python3-dev libfstrcmp-dev libpcre3 libpcre3-dev libtinyxml-dev libgtest-dev libunistring-dev
+            python3-dev libfstrcmp-dev libtinyxml-dev libgtest-dev
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: kodi-gbm-21.3-omega-ubuntu24
 
-      - name: 编译 Kodi GBM（官方推荐参数）
+      # ====== 3. Build Kodi ======
+      - name: Build Kodi GBM
         run: |
           cd kodi-src
           mkdir -p build && cd build
-
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
@@ -60,15 +62,12 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_PVR=ON \
-            -DENABLE_EVENTCLIENTS=OFF \
-            -DENABLE_INTERNAL_CROSSGUID=ON \
-            -DENABLE_INTERNAL_FMT=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
           make -j$(nproc)
 
-      - name: 打包成完美 deb（替代 checkinstall 的终极方案）
+      # ====== 4. Package Kodi (same as your original logic) ======
+      - name: Package Kodi into DEB
         run: |
           cd kodi-src/build
           cmake . \
@@ -78,24 +77,49 @@ jobs:
             -DCPACK_DEBIAN_PACKAGE_SECTION=video \
             -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 \
             -DCPACK_DEBIAN_PACKAGE_DEPENDS="libc6, libstdc++6, zlib1g, libgcc-s1" \
-            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions" \
-            -DCPACK_PACKAGE_DESCRIPTION="Kodi 21.3-Omega GBM for Ubuntu 24.04"
+            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions"
           cpack -G DEB
-          # mkdir -p ~/artifacts
-          # mv kodi-*.deb ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
-          # echo "大功告成！"
-          # ls -lh ~/artifacts/
 
-      - name: 复制原始 deb 包到 artifacts
+      - name: Save Kodi deb
         run: |
           mkdir -p ~/artifacts
           cp kodi-src/build/packages/*.deb ~/artifacts/
-          echo "所有原始 deb 已就位："
-          ls -lh ~/artifacts/
 
-      - name: 上传所有原始 Kodi deb 包
+      # ====== 5. Build pvr.iptvsimple ======
+      - name: Clone pvr.iptvsimple
+        run: |
+          git clone --depth 1 --branch 21.11.0-Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
+
+      - name: Build pvr.iptvsimple addon
+        run: |
+          mkdir -p pvr.iptvsimple/build
+          cd pvr.iptvsimple/build
+
+          cmake -G Ninja \
+            -DADDONS_TO_BUILD=pvr.iptvsimple \
+            -DADDON_SRC_PREFIX=../../ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=./install \
+            -DPACKAGE_ZIP=1 \
+            ../../kodi-src/cmake/addons
+
+          ninja
+
+          echo "==== Locate addon zip ===="
+          find $(pwd) -name "pvr.iptvsimple-*.zip" -ls
+
+      - name: Upload pvr.iptvsimple zip
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-21.3-Omega-gbm-ubuntu24.04-raw-debs
-          path: ~/artifacts/*.deb
+          name: pvr.iptvsimple-Omega
+          path: pvr.iptvsimple/build/addons/build/pvr.iptvsimple/*.zip
           if-no-files-found: error
+
+      # ====== 6. Upload Kodi deb + addon zip ======
+      - name: Upload all artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-gbm+iptvsimple
+          path: |
+            ~/artifacts/*.deb
+            pvr.iptvsimple/build/addons/build/pvr.iptvsimple/*.zip
