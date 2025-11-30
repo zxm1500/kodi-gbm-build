@@ -172,3 +172,45 @@ jobs:
   
             echo "=== Generated DEB package ==="
             ls -lh ~/artifacts/
+
+      # ----------------- 调试步骤 -----------------
+      - name: Debug - Check build directory
+        run: |
+          echo "=== 检查 build 目录 ==="
+          find kodi-src/build -name "*.deb" -type f 2>/dev/null || echo "build 目录中没有 DEB 文件"
+          echo "=== 检查整个工作空间 ==="
+          find . -name "*.deb" -type f | head -20 || echo "工作空间中没有任何 DEB 文件"
+          echo "=== 检查 artifacts 目录 ==="
+          ls -la ~/artifacts/ || echo "artifacts 目录不存在"
+          echo "=== 检查临时安装目录 ==="
+          ls -la /tmp/kodi-install/ 2>/dev/null | head -10 || echo "临时安装目录不存在"
+
+      - name: Debug - Check if Kodi binary was built
+        run: |
+          echo "=== 检查是否编译出 Kodi 可执行文件 ==="
+          find kodi-src/build -name "kodi" -type f -executable 2>/dev/null || echo "未找到 kodi 可执行文件"
+          find kodi-src/build -name "kodi.bin" -type f -executable 2>/dev/null || echo "未找到 kodi.bin 可执行文件"
+          echo "=== 检查 build 目录结构 ==="
+          ls -la kodi-src/build/ 2>/dev/null | head -15 || echo "build 目录不存在"
+
+      - name: Create test artifact to verify upload
+        run: |
+          mkdir -p ~/artifacts
+          echo "Kodi build completed at $(date)" > ~/artifacts/build-info.txt
+          echo "如果能看到这个文件，说明 artifact 上传功能正常" >> ~/artifacts/build-info.txt
+
+      - name: Upload debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files
+          path: |
+            ~/artifacts/
+            kodi-src/build/CMakeCache.txt
+          if-no-files-found: warn
+
+      - name: Upload DEB packages (if any)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-deb-packages
+          path: ~/artifacts/*.deb
+          if-no-files-found: ignore
