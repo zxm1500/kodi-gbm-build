@@ -108,26 +108,25 @@ jobs:
 
       - name: Build pvr.iptvsimple
         run: |
-          echo "=== Copy addon source into Kodi tree ==="
-          cp -r pvr.iptvsimple kodi-src/
+          echo "=== Sync addon source to Kodi tree ==="
+          rm -rf kodi-src/pvr.iptvsimple
+          cp -r pvr.iptvsimple kodi-src/pvr.iptvsimple
 
-          cd kodi-build
+          echo "=== Build pvr.iptvsimple ==="
+          mkdir -p build
+          cd build
+
           cmake \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
             -DADDON_SRC_PREFIX=../kodi-src \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_INSTALL_PREFIX=../kodi-src/addons \
             -DPACKAGE_ZIP=1 \
             ../kodi-src/cmake/addons
 
           make -j$(nproc)
 
-          # 列出可能的生成位置，便于调试
-          echo "=== Search possible zip locations ==="
-          find $(pwd) -maxdepth 6 -type f -name "pvr.iptvsimple-*.zip" -ls || true
-          # 也列出可能的安装目录
-          echo "=== List kodi-src/addons_install (where files are installed) ==="
-          ls -R ../../kodi-src/addons_install || true
+          echo "=== Find zip files ==="
+          find . -name "pvr.iptvsimple*.zip"
 
       - name: Package addon manually (if ZIP not auto-created)
         run: |
