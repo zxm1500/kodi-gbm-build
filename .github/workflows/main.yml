@@ -1,4 +1,5 @@
-name: Build Kodi GBM + PVR IPTV Simple for Ubuntu 24.04
+name: Build Kodi GBM for Ubuntu 24.04
+
 on:
   workflow_dispatch:
 
@@ -13,7 +14,7 @@ jobs:
       - name: Checkout workflow repo
         uses: actions/checkout@v4
 
-      # 更健壮的：获取目标分支/标签的最新 commit SHA，用作缓存 key（带调试输出与回退）
+      # 获取目标分支/标签的最新 commit SHA，用作缓存 key
       - name: Get Kodi remote commit SHA
         id: kodi_sha
         run: |
@@ -48,8 +49,6 @@ jobs:
           fi
 
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      # ...其余 steps 保持不变（略）...
 
       # ----------------- 源码缓存（基于远程 commit SHA） -----------------
       - name: Cache Kodi source
@@ -158,43 +157,11 @@ jobs:
           mkdir -p ~/artifacts
           cp -v *.deb ~/artifacts/ || echo "Warning: No Kodi main package generated"
 
-      # ----------------- 编译 pvr.iptvsimple -----------------
-      - name: Build pvr.iptvsimple addon
-        run: |
-          set -euo pipefail
-          cd kodi-src/addons
-          rm -rf pvr.iptvsimple
-          git clone --depth=1 --branch=Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
-          cd pvr.iptvsimple
-
-          mkdir -p build && cd build
-
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr \
-            -DADDON_SRC_PREFIX=../.. \
-            -DCMAKE_PREFIX_PATH=/usr/local \
-            -DPACKAGE_ZIP=1 \
-            -DCPACK_GENERATOR=DEB
-
-          make -j$(nproc)
-          make install DESTDIR=/tmp/pvr-install
-
-          echo "=== Running cpack for pvr.iptvsimple ==="
-          cpack -G DEB -V
-
-          echo "=== pvr.iptvsimple generated files ==="
-          find . -name "*.deb" -ls
-          find . -name "*.zip" -ls
-
-          mkdir -p ~/artifacts
-          cp -v *.deb *.zip ~/artifacts/ 2>/dev/null || echo "Warning: No pvr.iptvsimple deb/zip generated"
-
       # ----------------- 上传所有 DEB -----------------
       - name: Upload DEB packages
         uses: actions/upload-artifact@v4
         with:
-          name: kodi-gbm-pvr.iptvsimple-ubuntu24.04-amd64
+          name: kodi-gbm-ubuntu24.04-amd64
           path: ~/artifacts/*.deb
           if-no-files-found: error
 
