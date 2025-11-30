@@ -127,42 +127,8 @@ jobs:
           echo "=== Generated ZIPs ==="
           find . -name "pvr.iptvsimple*.zip"
 
-      - name: Package addon manually (if ZIP not auto-created)
-        run: |
-          # 有些配置不会自动生成 package zip，直接从 install 目录打包
-          if ls pvr.iptvsimple/build/*/pvr.iptvsimple-*.zip 1> /dev/null 2>&1; then
-            echo "zip already exists under build"
-            ls -l pvr.iptvsimple/build/*/pvr.iptvsimple-*.zip || true
-          else
-            echo "zip not found in build. Creating zip from installed addon folder..."
-            # 安装目录（cmake install 时通常放到 CMAKE_INSTALL_PREFIX 下）
-            INSTALL_DIR="../../kodi-src/addons_install/pvr.iptvsimple"
-            if [ -d "$INSTALL_DIR" ]; then
-              ZIPNAME="$(pwd)/pvr.iptvsimple-$(date +%Y%m%d%H%M%S).zip"
-              cd ../../kodi-src/addons_install
-              zip -r "$ZIPNAME" pvr.iptvsimple
-              echo "Created manual zip: $ZIPNAME"
-              ls -lh "$ZIPNAME"
-              # 把 zip 移回工作目录的 build 目录，方便后续上传
-              mv "$ZIPNAME" ../../../pvr.iptvsimple/build/
-            else
-              echo "Install dir not found: $INSTALL_DIR"
-              exit 1
-            fi
-          fi
-
-      - name: Upload pvr.iptvsimple zip
+      - name: Upload addon zip
         uses: actions/upload-artifact@v4
         with:
-          name: pvr.iptvsimple-Omega
-          path: pvr.iptvsimple/build/**/pvr.iptvsimple-*.zip
-          if-no-files-found: error
-
-      # 最后，合并 kodi deb 与 addon zip（可选）
-      - name: Upload all artifacts (combined)
-        uses: actions/upload-artifact@v4
-        with:
-          name: kodi-gbm+iptvsimple
-          path: |
-            ~/artifacts/*.deb
-            pvr.iptvsimple/build/**/pvr.iptvsimple-*.zip
+          name: pvr.iptvsimple
+          path: addon-build/**/pvr.iptvsimple*.zip
