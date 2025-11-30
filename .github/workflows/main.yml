@@ -68,23 +68,23 @@ jobs:
 
           make -j$(nproc)
 
-      # - name: 打包成完美 deb（替代 checkinstall 的终极方案）
-      #   run: |
-      #     cd kodi-src/build
-      #     cmake . \
-      #       -DCPACK_GENERATOR=DEB \
-      #       -DCPACK_DEBIAN_PACKAGE_NAME=kodi-gbm \
-      #       -DCPACK_PACKAGE_VERSION=21.3.0 \
-      #       -DCPACK_DEBIAN_PACKAGE_SECTION=video \
-      #       -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 \
-      #       -DCPACK_DEBIAN_PACKAGE_DEPENDS="libc6, libstdc++6, zlib1g, libgcc-s1" \
-      #       -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions" \
-      #       -DCPACK_PACKAGE_DESCRIPTION="Kodi 21.3-Omega GBM for Ubuntu 24.04"
-      #     cpack -G DEB
-      #     mkdir -p ~/artifacts
-      #     mv kodi-*.deb ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
-      #     echo "大功告成！"
-      #     ls -lh ~/artifacts/
+      - name: 打包成完美 deb（替代 checkinstall 的终极方案）
+        run: |
+          cd kodi-src/build
+          cmake . \
+            -DCPACK_GENERATOR=DEB \
+            -DCPACK_DEBIAN_PACKAGE_NAME=kodi-gbm \
+            -DCPACK_PACKAGE_VERSION=21.3.0 \
+            -DCPACK_DEBIAN_PACKAGE_SECTION=video \
+            -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 \
+            -DCPACK_DEBIAN_PACKAGE_DEPENDS="libc6, libstdc++6, zlib1g, libgcc-s1" \
+            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions" \
+            -DCPACK_PACKAGE_DESCRIPTION="Kodi 21.3-Omega GBM for Ubuntu 24.04"
+          cpack -G DEB
+          # mkdir -p ~/artifacts
+          # mv kodi-*.deb ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
+          # echo "大功告成！"
+          # ls -lh ~/artifacts/
 
       - name: 复制原始 deb 包到 artifacts
         run: |
