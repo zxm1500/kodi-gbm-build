@@ -86,14 +86,20 @@ jobs:
           echo "大功告成！"
           ls -lh ~/artifacts/
 
-      - name: 上传最终 DEB 包
-        uses: actions/upload-artifact@v4
-        with:
-          name: kodi-21.3-Omega-gbm-ubuntu24.04
-          path: ~/artifacts/*.deb
-          if-no-files-found: error
-
-      - name: 完成提示
+      - name: 打包完成 & 搬家（最终版）
         run: |
-          echo "Kodi 21.3-Omega GBM DEB 构建成功！"
-          ls -lh ~/artifacts/
+          cd kodi-src/build
+
+          # Kodi 官方 CPack 把包都扔到 packages/ 目录里
+          mkdir -p ~/artifacts
+          cp packages/*.deb ~/artifacts/
+
+          # 改个你喜欢的名字（只保留主包 + bin 包，其他的可选）
+          mv ~/artifacts/kodi_21.3~git*.deb \
+             ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
+
+          mv ~/artifacts/kodi-bin_21.3~git*.deb \
+             ~/artifacts/kodi-bin-21.3-Omega-gbm_ubuntu24.04_amd64.deb
+
+          echo "大功告成！两个核心 deb 已就位："
+          ls -lh ~/artifacts/*.deb
