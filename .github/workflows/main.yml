@@ -136,8 +136,7 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCPACK_GENERATOR=DEB
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
           make -j$(nproc)
 
@@ -153,19 +152,19 @@ jobs:
           mkdir -p /tmp/kodi-pkg/DEBIAN
           
           # 创建 control 文件（修复格式）
-          cat > /tmp/kodi-pkg/DEBIAN/control << 'EOF'
-          Package: kodi-gbm
-          Version: 21.3-1
-          Section: video
-          Priority: optional
-          Architecture: amd64
-          Depends: libc6 (>= 2.34), libstdc++6 (>= 12), libgcc1 (>= 12), zlib1g (>= 1:1.2.11)
-          Maintainer: Kodi Builder <builder@kodi.org>
-          Description: Kodi Media Center with GBM support
-           Kodi is an award-winning free and open source software media center.
-           This version is built with GBM platform support for Ubuntu 24.04.
-          Homepage: https://kodi.tv
-          EOF
+                    cat > /tmp/kodi-pkg/DEBIAN/control << 'EOF'
+Package: kodi-gbm
+Version: 21.3-1
+Section: video
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.34), libstdc++6 (>= 12), libgcc1 (>= 12), zlib1g (>= 1:1.2.11)
+Maintainer: Kodi Builder <builder@kodi.org>
+Description: Kodi Media Center with GBM support
+ Kodi is an award-winning free and open source software media center.
+ This version is built with GBM platform support for Ubuntu 24.04.
+Homepage: https://kodi.tv
+EOF
 
           # 复制文件到包目录
           mkdir -p /tmp/kodi-pkg/usr
