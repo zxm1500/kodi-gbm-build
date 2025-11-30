@@ -108,24 +108,23 @@ jobs:
 
       - name: Build pvr.iptvsimple
         run: |
-          echo "=== Sync addon source to Kodi tree ==="
+          echo "=== Copy addon to Kodi source ==="
           rm -rf kodi-src/pvr.iptvsimple
           cp -r pvr.iptvsimple kodi-src/pvr.iptvsimple
 
-          echo "=== Build pvr.iptvsimple ==="
-          mkdir -p build
-          cd build
+          mkdir -p addon-build
+          cd addon-build
 
           cmake \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
             -DADDON_SRC_PREFIX=../kodi-src \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=Release \
             -DPACKAGE_ZIP=1 \
             ../kodi-src/cmake/addons
 
           make -j$(nproc)
 
-          echo "=== Find zip files ==="
+          echo "=== Generated ZIPs ==="
           find . -name "pvr.iptvsimple*.zip"
 
       - name: Package addon manually (if ZIP not auto-created)
