@@ -18,18 +18,28 @@ jobs:
         run: |
           sudo apt update -qq
           sudo apt install -y \
-            build-essential cmake git ccache pkg-config \
-            libgbm-dev libdrm-dev libegl1-mesa-dev libgles2-mesa-dev \
-            libinput-dev libxkbcommon-dev libudev-dev \
-            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-            libcurl4-openssl-dev libass-dev libfreetype6-dev \
-            libfontconfig1-dev libfribidi-dev libtinyxml2-dev \
-            rapidjson-dev flatbuffers-compiler libflatbuffers-dev \
-            libcrossguid-dev libp8-platform-dev libfmt-dev \
-            python3-dev libbluray-dev libnfs-dev libmicrohttpd-dev \
-            libsqlite3-dev libtag1-dev libxslt1-dev liblzo2-dev \
-            libva-dev libvdpau-dev libcec-dev libplist-dev \
-            libshairplay-dev libsmbclient-dev
+            autoconf automake autopoint bison flex gettext \
+            cmake curl gcc g++ git pkg-config yasm nasm \
+            meson ninja-build swig unzip ccache \
+            build-essential libtool fakeroot dpkg-dev \
+            libasound2-dev libass-dev libbluray-dev libbz2-dev \
+            libcdio-dev libcec-dev libcurl4-openssl-dev \
+            libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
+            libfreetype6-dev libfribidi-dev libgcrypt20-dev \
+            libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libegl1-mesa-dev libgles2-mesa-dev \
+            libgnutls28-dev libgpg-error-dev libiso9660-dev \
+            libjpeg-dev liblcms2-dev liblirc-dev liblzo2-dev \
+            libmicrohttpd-dev libnfs-dev libogg-dev libpcre2-dev \
+            libplist-dev libpng-dev libpulse-dev libshairplay-dev \
+            libsmbclient-dev libspdlog-dev libsqlite3-dev libssl-dev \
+            libtag1-dev libtiff5-dev libtinyxml2-dev libudev-dev \
+            libva-dev libvdpau-dev libvorbis-dev libxml2-dev libxslt1-dev \
+            libxkbcommon-dev libxrandr-dev zlib1g-dev \
+            libwayland-dev libgbm-dev libdrm-dev libinput-dev \
+            libdisplay-info-dev liburiparser-dev rapidjson-dev \
+            nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev libpugixml-dev \
+            python3-dev libfstrcmp-dev libpcre3 libpcre3-dev libtinyxml-dev libgtest-dev libunistring-dev
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
