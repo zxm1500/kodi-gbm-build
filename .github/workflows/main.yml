@@ -10,13 +10,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ====== 1. Clone Kodi ======
+      # ---------------- Clone Kodi（保持你原来的做法） ----------------
       - name: Clone Kodi 21.3-Omega
         run: |
           git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
-      # ====== 2. Install Dependencies ======
-      - name: Install dependencies for Kodi + Addons
+      # ---------------- 安装完整依赖（恢复为你原始列表） ----------------
+      - name: 安装完整依赖（精简但你原来用过的那套）
         run: |
           sudo apt update -qq
           sudo apt install -y \
@@ -41,18 +41,20 @@ jobs:
             libwayland-dev libgbm-dev libdrm-dev libinput-dev \
             libdisplay-info-dev liburiparser-dev rapidjson-dev \
             nlohmann-json3-dev flatbuffers-compiler libflatbuffers-dev libpugixml-dev \
-            python3-dev libfstrcmp-dev libtinyxml-dev libgtest-dev
+            python3-dev libfstrcmp-dev libpcre3 libpcre3-dev libtinyxml-dev libgtest-dev libunistring-dev
 
+      # ---------------- ccache（保持你原来） ----------------
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: kodi-gbm-21.3-omega-ubuntu24
 
-      # ====== 3. Build Kodi ======
-      - name: Build Kodi GBM
+      # ---------------- 编译 Kodi（保持你原来参数） ----------------
+      - name: 编译 Kodi GBM（官方推荐参数）
         run: |
           cd kodi-src
           mkdir -p build && cd build
+
           cmake .. \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr \
@@ -62,12 +64,16 @@ jobs:
             -DENABLE_INTERNAL_DAV1D=ON \
             -DENABLE_INTERNAL_FLATBUFFERS=ON \
             -DENABLE_PVR=ON \
+            -DENABLE_EVENTCLIENTS=OFF \
+            -DENABLE_INTERNAL_CROSSGUID=ON \
+            -DENABLE_INTERNAL_FMT=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
           make -j$(nproc)
 
-      # ====== 4. Package Kodi (same as your original logic) ======
-      - name: Package Kodi into DEB
+      # ---------------- 打包成 deb（保持你原来步骤） ----------------
+      - name: 打包成 DEB
         run: |
           cd kodi-src/build
           cmake . \
@@ -77,49 +83,90 @@ jobs:
             -DCPACK_DEBIAN_PACKAGE_SECTION=video \
             -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 \
             -DCPACK_DEBIAN_PACKAGE_DEPENDS="libc6, libstdc++6, zlib1g, libgcc-s1" \
-            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions"
+            -DCPACK_DEBIAN_PACKAGE_MAINTAINER="GitHub Actions" \
+            -DCPACK_PACKAGE_DESCRIPTION="Kodi 21.3-Omega GBM for Ubuntu 24.04"
           cpack -G DEB
 
-      - name: Save Kodi deb
+      - name: 复制原始 deb 包到 artifacts
         run: |
           mkdir -p ~/artifacts
           cp kodi-src/build/packages/*.deb ~/artifacts/
+          echo "所有原始 deb 已就位："
+          ls -lh ~/artifacts/ || true
 
-      # ====== 5. Build pvr.iptvsimple ======
+      - name: 上传所有原始 Kodi deb 包
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-21.3-Omega-gbm-ubuntu24.04-raw-debs
+          path: ~/artifacts/*.deb
+          if-no-files-found: error
+
+      # ---------------- 在已经构建的 Kodi 环境基础上构建 addon ----------------
       - name: Clone pvr.iptvsimple
         run: |
           git clone --depth 1 --branch 21.11.0-Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-      - name: Build pvr.iptvsimple addon
+      - name: Build pvr.iptvsimple addon (use kodi-src)
         run: |
+          # 进入 addon 的 build 目录（相对于工作区根）
           mkdir -p pvr.iptvsimple/build
           cd pvr.iptvsimple/build
 
+          # 使用 kodi-src 下的 cmake/addons 来配置 addon 构建环境
           cmake -G Ninja \
             -DADDONS_TO_BUILD=pvr.iptvsimple \
-            -DADDON_SRC_PREFIX=../../ \
+            -DADDON_SRC_PREFIX=../../kodi-src \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=./install \
+            -DCMAKE_INSTALL_PREFIX=../../kodi-src/addons_install \
             -DPACKAGE_ZIP=1 \
             ../../kodi-src/cmake/addons
 
+          # 用 ninja 构建（ninja 会执行 install 操作并将文件放到 DCMAKE_INSTALL_PREFIX 指向的目录）
           ninja
 
-          echo "==== Locate addon zip ===="
-          find $(pwd) -name "pvr.iptvsimple-*.zip" -ls
+          # 列出可能的生成位置，便于调试
+          echo "=== Search possible zip locations ==="
+          find $(pwd) -maxdepth 6 -type f -name "pvr.iptvsimple-*.zip" -ls || true
+          # 也列出可能的安装目录
+          echo "=== List kodi-src/addons_install (where files are installed) ==="
+          ls -R ../../kodi-src/addons_install || true
+
+      - name: Package addon manually (if ZIP not auto-created)
+        run: |
+          # 有些配置不会自动生成 package zip，直接从 install 目录打包
+          if ls pvr.iptvsimple/build/*/pvr.iptvsimple-*.zip 1> /dev/null 2>&1; then
+            echo "zip already exists under build"
+            ls -l pvr.iptvsimple/build/*/pvr.iptvsimple-*.zip || true
+          else
+            echo "zip not found in build. Creating zip from installed addon folder..."
+            # 安装目录（cmake install 时通常放到 CMAKE_INSTALL_PREFIX 下）
+            INSTALL_DIR="../../kodi-src/addons_install/pvr.iptvsimple"
+            if [ -d "$INSTALL_DIR" ]; then
+              ZIPNAME="$(pwd)/pvr.iptvsimple-$(date +%Y%m%d%H%M%S).zip"
+              cd ../../kodi-src/addons_install
+              zip -r "$ZIPNAME" pvr.iptvsimple
+              echo "Created manual zip: $ZIPNAME"
+              ls -lh "$ZIPNAME"
+              # 把 zip 移回工作目录的 build 目录，方便后续上传
+              mv "$ZIPNAME" ../../../pvr.iptvsimple/build/
+            else
+              echo "Install dir not found: $INSTALL_DIR"
+              exit 1
+            fi
+          fi
 
       - name: Upload pvr.iptvsimple zip
         uses: actions/upload-artifact@v4
         with:
           name: pvr.iptvsimple-Omega
-          path: pvr.iptvsimple/build/addons/build/pvr.iptvsimple/*.zip
+          path: pvr.iptvsimple/build/**/pvr.iptvsimple-*.zip
           if-no-files-found: error
 
-      # ====== 6. Upload Kodi deb + addon zip ======
-      - name: Upload all artifacts
+      # 最后，合并 kodi deb 与 addon zip（可选）
+      - name: Upload all artifacts (combined)
         uses: actions/upload-artifact@v4
         with:
           name: kodi-gbm+iptvsimple
           path: |
             ~/artifacts/*.deb
-            pvr.iptvsimple/build/addons/build/pvr.iptvsimple/*.zip
+            pvr.iptvsimple/build/**/pvr.iptvsimple-*.zip
