@@ -86,20 +86,16 @@ jobs:
           echo "大功告成！"
           ls -lh ~/artifacts/
 
-      - name: 打包完成 & 搬家（最终版）
+      - name: 复制原始 deb 包到 artifacts
         run: |
-          cd kodi-src/build
-
-          # Kodi 官方 CPack 把包都扔到 packages/ 目录里
           mkdir -p ~/artifacts
-          cp packages/*.deb ~/artifacts/
+          cp kodi-src/build/packages/*.deb ~/artifacts/
+          echo "所有原始 deb 已就位："
+          ls -lh ~/artifacts/
 
-          # 改个你喜欢的名字（只保留主包 + bin 包，其他的可选）
-          mv ~/artifacts/kodi_21.3~git*.deb \
-             ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
-
-          mv ~/artifacts/kodi-bin_21.3~git*.deb \
-             ~/artifacts/kodi-bin-21.3-Omega-gbm_ubuntu24.04_amd64.deb
-
-          echo "大功告成！两个核心 deb 已就位："
-          ls -lh ~/artifacts/*.deb
+      - name: 上传所有原始 Kodi deb 包
+        uses: actions/upload-artifact@v4
+        with:
+          name: kodi-21.3-Omega-gbm-ubuntu24.04-raw-debs
+          path: ~/artifacts/*.deb
+          if-no-files-found: error
