@@ -168,20 +168,21 @@ jobs:
           EOF
 
           # 复制文件到包目录
-          mkdir -p /tmp/kodi-pkg
-          cp -r /tmp/kodi-install/* /tmp/kodi-pkg/
+          mkdir -p /tmp/kodi-pkg/usr
+          cp -r /tmp/kodi-install/usr/local/* /tmp/kodi-pkg/usr/
 
           # 修复文件权限
           find /tmp/kodi-pkg -type d -exec chmod 755 {} \;
           find /tmp/kodi-pkg -type f -exec chmod 644 {} \;
           find /tmp/kodi-pkg/usr -name "*.so*" -exec chmod 755 {} \; 2>/dev/null || true
+          find /tmp/kodi-pkg/usr/bin -type f -exec chmod 755 {} \; 2>/dev/null || true
 
           # 构建 DEB 包
           dpkg-deb --build /tmp/kodi-pkg kodi-21.3-gbm_amd64.deb
 
           # 验证 DEB 包
-          echo "=== 验证 DEB 包 ==="
-          dpkg -c kodi-21.3-gbm_amd64.deb | head -10
+          echo "=== 验证 DEB 包内容 ==="
+          dpkg -c kodi-21.3-gbm_amd64.deb | head -20
 
           # 复制到 artifacts
           mkdir -p ~/artifacts
