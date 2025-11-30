@@ -152,7 +152,7 @@ jobs:
           mkdir -p /tmp/kodi-pkg/DEBIAN
           
           # 创建 control 文件（修复格式）
-                    cat > /tmp/kodi-pkg/DEBIAN/control << 'EOF'
+          cat > /tmp/kodi-pkg/DEBIAN/control << 'EOF'
 Package: kodi-gbm
 Version: 21.3-1
 Section: video
