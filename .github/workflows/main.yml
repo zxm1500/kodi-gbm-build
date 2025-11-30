@@ -102,27 +102,35 @@ jobs:
           if-no-files-found: error
 
       # ---------------- 在已经构建的 Kodi 环境基础上构建 addon ----------------
+      # ---------------- Clone pvr.iptvsimple ----------------
       - name: Clone pvr.iptvsimple
         run: |
           git clone --depth 1 --branch 21.11.0-Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-      - name: Package addon manually
+      # ---------------- 使用 Kodi 编译环境构建 addon（不会重编 Kodi） ----------------
+      - name: Build addon pvr.iptvsimple
         run: |
-          echo "=== Package addon manually from output ==="
-          ADDON_DIR="kodi-src/cmake/addons/output/addons/pvr.iptvsimple"
-          if [ ! -d "$ADDON_DIR" ]; then
-            echo "Addon folder not found: $ADDON_DIR"
-            exit 1
-          fi
+          mkdir -p addon-build
+          cd addon-build
 
-          ZIP_NAME="pvr.iptvsimple-$(date +%Y%m%d%H%M%S).zip"
-          cd kodi-src/cmake/addons/output/addons
-          zip -r "../../../$ZIP_NAME" pvr.iptvsimple
+          cmake ../kodi-src/cmake/addons \
+            -DADDONS_TO_BUILD=pvr.iptvsimple \
+            -DADDON_SRC_PREFIX=../ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPACKAGE_ZIP=1
 
-          echo "=== ZIP generated at kodi-src/cmake/addons/output/$ZIP_NAME ==="
+          make -j$(nproc)
 
+      # ---------------- 查找生成的ZIP ----------------
+      - name: Find addon ZIP
+        run: |
+          echo "=== Searching ZIP ==="
+          find . -name "pvr.iptvsimple-*.zip" -ls || true
+
+      # ---------------- 上传 addon ZIP ----------------
       - name: Upload addon ZIP
         uses: actions/upload-artifact@v4
         with:
           name: pvr.iptvsimple
-          path: kodi-src/cmake/addons/output/*.zip
+          path: addon-build/**/*.zip
+          if-no-files-found: error
