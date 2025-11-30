@@ -141,31 +141,34 @@ jobs:
 
           make -j$(nproc)
 
-          # 关键修复1：Kodi 必须先 make install 才能让 cpack 正确生成包名
-          sudo make install
-          # 或者用 destdir 安装到临时目录再打包（更干净，但需要额外一步）
-          # make DESTDIR=/tmp/kodi-install install
-
-          # 关键修复2：明确指定工作目录并显示生成的文件
-          echo "=== Running cpack in $(pwd) ==="
-          cpack -G DEB -V
-
-          echo "=== List all files after cpack ==="
-          ls -la *.deb || echo "No .deb here"
-
-          # 关键修复3：万一文件名带版本号之类的，用通配符全部搬走
-          mkdir -p ~/artifacts
-          cp -v *.deb ~/artifacts/ || echo "Warning: No Kodi main package generated"
-
-      # ----------------- 上传所有 DEB -----------------
-      - name: Upload DEB packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: kodi-gbm-ubuntu24.04-amd64
-          path: ~/artifacts/*.deb
-          if-no-files-found: error
-
-      - name: List generated packages
-        run: |
-          echo "构建完成！生成的包如下："
-          ls -lh ~/artifacts/*.deb || echo "No packages found"
+            # 使用 DESTDIR 安装到临时目录
+            mkdir -p /tmp/kodi-install
+            make DESTDIR=/tmp/kodi-install install
+  
+            # 手动创建 DEB 包
+            mkdir -p /tmp/kodi-pkg/DEBIAN
+            cat > /tmp/kodi-pkg/DEBIAN/control << EOF
+            Package: kodi-gbm
+            Version: 21.3
+            Section: video
+            Priority: optional
+            Architecture: amd64
+            Depends: libc6, libstdc++6, libgcc1, zlib1g
+            Maintainer: Kodi Builder <builder@example.com>
+            Description: Kodi Media Center with GBM support
+             Kodi is an award-winning free and open source software media center.
+             This version is built with GBM platform support.
+            EOF
+  
+            # 复制文件
+            cp -r /tmp/kodi-install/* /tmp/kodi-pkg/
+  
+            # 构建 DEB 包
+            dpkg-deb --build /tmp/kodi-pkg kodi-21.3-gbm_amd64.deb
+  
+            # 创建 artifacts 目录并复制包
+            mkdir -p ~/artifacts
+            cp kodi-21.3-gbm_amd64.deb ~/artifacts/
+  
+            echo "=== Generated DEB package ==="
+            ls -lh ~/artifacts/
