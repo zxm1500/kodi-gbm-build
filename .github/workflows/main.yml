@@ -68,32 +68,15 @@ jobs:
 
           make -j$(nproc)
 
-      - name: 直接用 checkinstall 打 DEB（最稳最简单）
+      - name: 打包成完美 deb（替代 checkinstall 的终极方案）
         run: |
           cd kodi-src/build
-          sudo make install DESTDIR=/tmp/inst
-
-          # checkinstall 是最靠谱的打 Kodi deb 方式（自动处理依赖
-          sudo apt install -y checkinstall
-          cd /tmp/inst
-
-          sudo checkinstall -D --install=no --fstrans=yes \
-            --pakdir ~/artifacts \
-            --maintainer "GitHub Actions" \
-            --pkgname kodi-gbm-omega \
-            --pkgversion 21.3 \
-            --pkgrelease 1ubuntu24.04 \
-            --pkgarch amd64 \
-            --nodoc \
-            --deldoc=yes \
-            --deldesc=yes \
-            --delspec=yes \
-            --backup=no \
-            make install
-
-          # 改个好听的名字
-          mv ~/artifacts/kodi-gbm-omega_21.3-1ubuntu24.04_amd64.deb \
-             ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
+          sudo make install DESTDIR=/tmp/kodi-inst
+          sudo apt install -y fakeroot
+          cpack -G DEB
+          mkdir -p ~/artifacts
+          mv kodi-*.deb ~/artifacts/kodi-21.3-Omega-gbm_ubuntu24.04_amd64.deb
+          ls -lh ~/artifacts/
 
       - name: 上传最终 DEB 包
         uses: actions/upload-artifact@v4
