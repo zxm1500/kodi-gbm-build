@@ -106,30 +106,23 @@ jobs:
         run: |
           git clone --depth 1 --branch 21.11.0-Omega https://github.com/kodi-pvr/pvr.iptvsimple.git
 
-      - name: Build pvr.iptvsimple (external build → WILL GENERATE ZIP)
+      - name: Package addon manually
         run: |
-          mkdir -p external-addons
-          cp -r pvr.iptvsimple external-addons/
+          echo "=== Package addon manually from output ==="
+          ADDON_DIR="kodi-src/cmake/addons/output/addons/pvr.iptvsimple"
+          if [ ! -d "$ADDON_DIR" ]; then
+            echo "Addon folder not found: $ADDON_DIR"
+            exit 1
+          fi
 
-          mkdir -p addon-build
-          cd addon-build
+          ZIP_NAME="pvr.iptvsimple-$(date +%Y%m%d%H%M%S).zip"
+          cd kodi-src/cmake/addons/output/addons
+          zip -r "../../../$ZIP_NAME" pvr.iptvsimple
 
-          cmake \
-            -DADDONS_TO_BUILD=pvr.iptvsimple \
-            -DADDON_SRC_PREFIX=../external-addons \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DPACKAGE_ZIP=1 \
-            ../kodi-src/cmake/addons
+          echo "=== ZIP generated at kodi-src/cmake/addons/output/$ZIP_NAME ==="
 
-          make -j$(nproc)
-
-          echo "=== Generated ZIPs ==="
-          find . -name "pvr.iptvsimple*.zip"
-
-
-      - name: Upload addon zip
+      - name: Upload addon ZIP
         uses: actions/upload-artifact@v4
         with:
           name: pvr.iptvsimple
-          path: addon-build/**/pvr.iptvsimple*.zip
-          if-no-files-found: error
+          path: kodi-src/cmake/addons/output/*.zip
