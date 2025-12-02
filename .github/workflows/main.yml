@@ -12,7 +12,7 @@ jobs:
       # 直接用固定 tag，省去一切缓存和 sha 麻烦
       - name: Clone Kodi 21.3-Omega
         run: |
-          git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
+          git clone --branch 21.3-Omega https://github.com/xbmc/xbmc.git kodi-src
 
       - name: 安装完整依赖（精简但足够）
         run: |
