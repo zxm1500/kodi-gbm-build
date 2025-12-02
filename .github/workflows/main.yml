@@ -68,6 +68,15 @@ jobs:
 
           make -j$(nproc)
 
+      - name: 修复 CPack changelog 生成（临时 patch 源代码）
+        run: |
+          cd kodi-src
+          # 备份原文件
+          cp cmake/cpack/CPackConfigDEB.cmake CPackConfigDEB.cmake.bak
+          # 用 sed 替换 --since="30 days ago" 为 --since="60 days ago"（确保 log 非空）
+          sed -i 's/--since="30 days ago"/--since="60 days ago"/g' cmake/cpack/CPackConfigDEB.cmake
+          echo "Patch applied: Now using 60-day window for changelog."
+
       - name: 打包成完美 deb（替代 checkinstall 的终极方案）
         run: |
           cd kodi-src/build
