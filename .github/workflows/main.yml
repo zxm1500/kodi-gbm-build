@@ -23,7 +23,7 @@ jobs:
             meson ninja-build swig unzip ccache \
             build-essential libtool fakeroot dpkg-dev \
             libasound2-dev libass-dev libbluray-dev libbz2-dev \
-            libcdio-dev libcec-dev libcurl4-openssl-dev \
+            libcdio-dev libcdio++-dev libcec-dev libcurl4-openssl-dev \
             libdbus-1-dev libexiv2-dev libflac-dev libfontconfig-dev \
             libfreetype6-dev libfribidi-dev libgcrypt20-dev \
             libgif-dev libgl1-mesa-dev libglu1-mesa-dev \
